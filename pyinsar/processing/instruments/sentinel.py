@@ -1,6 +1,5 @@
 # Package imports
-from .methods import OrbitInterpolation
-from .utilities.generic import phase_shift, findClosestTime
+from pyinsar.processing.utilities.generic import phaseShift, findClosestTime, OrbitInterpolation
 
 # Standard library imports
 from collections import OrderedDict
@@ -13,7 +12,7 @@ import pandas as pd
 from scipy.constants import c
 
 
-def transform_slc(slc, deramped_phase, transformation_matrix):
+def transformSLC(slc, deramped_phase, transformation_matrix):
     '''
     @param slc: Input slc
     @param ramp_phase: Phase to be removed before the transformation and to be readded afterwards
@@ -23,12 +22,12 @@ def transform_slc(slc, deramped_phase, transformation_matrix):
     '''
     deramped_shifted = cv2.warpAffine(deramped_phase, transformation_matrix, None, cv2.INTER_LANCZOS4)
     
-    deramped_slc = phase_shift(slc, deramped_phase)
+    deramped_slc = phaseShift(slc, deramped_phase)
 
     burst_slc_shifted =      cv2.warpAffine(deramped_slc.real, transformation_matrix, None, cv2.INTER_LANCZOS4) \
                         + 1j*cv2.warpAffine(deramped_slc.imag, transformation_matrix, None, cv2.INTER_LANCZOS4)
         
-    return phase_shift(burst_slc_shifted, -deramped_shifted)
+    return phaseShift(burst_slc_shifted, -deramped_shifted)
 
 def selectValidLines(data, tree,cut=True):
     '''
@@ -336,28 +335,3 @@ def readGeoLocation(in_geolocation_tree, azimuth_time):
     results['Longitude'] = longitudes
 
     return results
-
-
-def parseSatelliteData(in_satellite_file):
-    '''
-    Parse Sentinel satelllite data
-
-    @param in_sentinel_file: Satellite orbit filename
-
-    @return DataFrame of orbit information
-    '''
-    satellite_tree = ET.parse(in_satellite_file)
-    
-    names = ['TAI', 'UTC', 'UT1','Absolute_Orbit', 'X', 'Y', 'Z', 'VX', 'VY', 'VZ', 'Quality']
-    time_converter = lambda x: pd.to_datetime(x[4:])
-    converters = [time_converter, time_converter, time_converter, int, float, float, float, 
-                  float, float, float, lambda x: x]
-    tmp_data = []
-
-    for orbit in satellite_tree.findall('Data_Block/List_of_OSVs/OSV'):
-        row = []
-        for name, converter in zip(names, converters):
-            row.append(converter(orbit.find(name).text))
-        tmp_data.append(row)
-
-    return pd.DataFrame(tmp_data, columns=names)

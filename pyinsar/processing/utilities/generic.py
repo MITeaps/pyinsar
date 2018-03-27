@@ -9,7 +9,7 @@ from scipy.interpolate import interp1d
 from geodesy import wgs84
 import numpy as np
 
-def phase_shift(data, phase):
+def phaseShift(data, phase):
     '''
      Apply a phase shift to data
 
