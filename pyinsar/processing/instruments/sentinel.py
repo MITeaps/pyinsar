@@ -27,7 +27,7 @@ def transformSLC(slc, deramped_phase, transformation_matrix):
     burst_slc_shifted =      cv2.warpAffine(deramped_slc.real, transformation_matrix, None, cv2.INTER_LANCZOS4) \
                         + 1j*cv2.warpAffine(deramped_slc.imag, transformation_matrix, None, cv2.INTER_LANCZOS4)
         
-    return phaseShift(burst_slc_shifted, -deramped_shifted)
+    return phaseShift(burst_slc_shifted, -deramped_shifted), deramped_shifted
 
 def selectValidLines(data, tree,cut=True):
     '''
