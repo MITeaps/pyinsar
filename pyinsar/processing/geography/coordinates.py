@@ -37,8 +37,8 @@ def transform_to_pixel_coordinates(x, y,
     '''
     Transform some geographic coordinates to pixel coordinates in an array
     
-    @param x: Coordinate along the x axis to tranform
-    @param y: Coordinate along the y axis to tranform
+    @param x: Coordinate along the x axis to transform
+    @param y: Coordinate along the y axis to transform
     @param x_min: Minimal coordinate of the array along the x axis (along the cell border)
     @param x_max: Maximal coordinate of the array along the x axis (along the cell border)
     @param y_min: Minimal coordinate of the array along the y axis (along the cell border)
@@ -60,8 +60,8 @@ def transform_to_geographic_coordinates(u, v,
     '''
     Transform some pixel coordinates in an array to geographic coordinates
     
-    @param u: Pixel coordinate along the x axis to tranform
-    @param v: Pixel coordinate along the y axis to tranform
+    @param u: Pixel coordinate along the x axis to transform
+    @param v: Pixel coordinate along the y axis to transform
     @param x_min: Minimal coordinate of the array along the x axis (along the cell border)
     @param x_max: Maximal coordinate of the array along the x axis (along the cell border)
     @param y_min: Minimal coordinate of the array along the y axis (along the cell border)
@@ -104,26 +104,101 @@ def compute_x_and_y_coordinates_maps(x_min, x_max,
     
     return np.meshgrid(x_array, y_array)
 
+def extract_subgeoarray(georaster_array,
+                        georaster_extent,
+                        x_min, x_max,
+                        y_min, y_max,
+                        center_extent = False):
+    '''
+    Extract a sub-array given some geographical coordinates. The new extent's
+    coordinates don't have to be along a pixel border
+    
+    @param georaster_array: A 2D NumPy array
+    @param georaster_extent: The array current extent (along the cells' borders)
+    @param x_min: New minimal coordinate along the x axis (along the cell border)
+    @param x_max: New maximal coordinate along the x axis (along the cell border)
+    @param y_min: New minimal coordinate along the y axis (along the cell border)
+    @param y_max: New maximal coordinate along the y axis (along the cell border)
+    @param center_extent: Whether the new extent should be along the cells' 
+                          borders or centers
+    
+    @return The sub-array and its extent
+    '''
+    assert len(georaster_array.shape) == 2, "The array must be two-dimensional"
+    assert len(georaster_extent) == 4, "The extent must have contain 4 coordinates"
+
+    i_min, j_min = transform_to_pixel_coordinates(x_min, y_min, 
+                                                  georaster_extent[0], georaster_extent[1],
+                                                  georaster_extent[2], georaster_extent[3], 
+                                                  georaster_array.shape[1], georaster_array.shape[0])
+    i_max, j_max = transform_to_pixel_coordinates(x_max, y_max, 
+                                                  georaster_extent[0], georaster_extent[1],
+                                                  georaster_extent[2], georaster_extent[3], 
+                                                  georaster_array.shape[1], georaster_array.shape[0])
+    new_georaster_array = georaster_array[j_max:j_min, i_min:i_max]
+
+    new_x_min, new_y_min = transform_to_geographic_coordinates(i_min, j_min, 
+                                                               georaster_extent[0], georaster_extent[1],
+                                                               georaster_extent[2], georaster_extent[3], 
+                                                               georaster_array.shape[1], georaster_array.shape[0])
+    new_x_max, new_y_max = transform_to_geographic_coordinates(i_max, j_max, 
+                                                               georaster_extent[0], georaster_extent[1],
+                                                               georaster_extent[2], georaster_extent[3], 
+                                                               georaster_array.shape[1], georaster_array.shape[0])
+    
+    if center_extent == False:
+        pixel_x_size = (georaster_extent[1] - georaster_extent[0])/georaster_array.shape[1]
+        pixel_y_size = (georaster_extent[3] - georaster_extent[2])/georaster_array.shape[0]
+        new_x_min -= 0.5*pixel_x_size
+        new_y_min += 0.5*pixel_y_size
+        new_x_max -= 0.5*pixel_x_size
+        new_y_max += 0.5*pixel_y_size
+
+    new_georaster_extent = (new_x_min, new_x_max, new_y_min, new_y_max)
+    
+    return new_georaster_array, new_georaster_extent
+
 ################################################################################
 # Projection
 ################################################################################
 
-def reproject_point(lon, lat, old_projection_wkt, new_projection_wkt):
+def reproject_point(lon,
+                    lat,
+                    old_projection_EPSG = None,
+                    old_projection_wkt = None,
+                    new_projection_EPSG = None,
+                    new_projection_wkt = None):
     '''
     Reproject a single point
     
     @param lon: Longitude of the point
     @param lat: Latitude of the point
-    @param old_projection_wkt: WKT code of the current projection
-    @param new_projection_wkt: WKT code of the new projection
+    @param old_projection_EPSG: EPSG code of the old projection
+    @param old_projection_wkt: WKT code of the old projection (can be used instead
+                               of the old_projection_EPSG)
+    @param new_projection_EPSG: EPSG code of the new projection
+    @param new_projection_wkt: WKT code of the new projection (can be used instead
+                               of the new_projection_EPSG)
     
     @return The coordinates' arrays
     '''
+    assert (old_projection_EPSG is not None
+            or old_projection_wkt is not None), 'No old projection provided'
+    assert (new_projection_EPSG is not None
+            or new_projection_wkt is not None), 'No new projection provided'
+
+
     old_spatial_reference = osr.SpatialReference()
-    old_spatial_reference.ImportFromWkt(old_projection_wkt)
+    if old_projection_EPSG is not None:
+        old_spatial_reference.ImportFromEPSG(old_projection_EPSG)
+    elif old_projection_wkt is not None:
+        old_spatial_reference.ImportFromWkt(old_projection_wkt)
     
     new_spatial_reference = osr.SpatialReference()
-    new_spatial_reference.ImportFromWkt(new_projection_wkt)
+    if new_projection_EPSG is not None:
+        new_spatial_reference.ImportFromEPSG(new_projection_EPSG)
+    elif new_projection_wkt is not None:
+        new_spatial_reference.ImportFromWkt(new_projection_wkt)
 
     transform = osr.CoordinateTransformation(old_spatial_reference,
                                              new_spatial_reference)
@@ -187,20 +262,23 @@ def reproject_georaster(georaster,
                         old_geotransform[4],
                         -new_cell_sizes[1])
 
+    number_of_bands = georaster.RasterCount
+    
     driver = gdal.GetDriverByName(file_type)
     new_georaster = driver.Create(file_path,
                                int(abs(lrx - ulx)/new_cell_sizes[0]),
                                int(abs(uly - lry)/new_cell_sizes[1]),
-                               1,
+                               number_of_bands,
                                data_type)
     new_georaster.SetGeoTransform(new_geotransform)
     new_georaster.SetProjection(new_spatial_reference.ExportToWkt())
-    new_georaster_band = new_georaster.GetRasterBand(1)
-    new_georaster_band.SetNoDataValue(no_data_value)
-    new_georaster_band.SetScale(scale)
-    new_georaster_band.SetOffset(offset)
-    # Fill the georaster band, otherwise no data values are not set in the new georaster
-    new_georaster_band.Fill(no_data_value)
+    for i_band in range(1, number_of_bands + 1):
+        new_georaster_band = new_georaster.GetRasterBand(i_band)
+        new_georaster_band.SetNoDataValue(no_data_value)
+        new_georaster_band.SetScale(scale)
+        new_georaster_band.SetOffset(offset)
+        # Fill the georaster band, otherwise no data values are not set in the new georaster
+        new_georaster_band.Fill(no_data_value)
 
     res = gdal.ReprojectImage(georaster,
                               new_georaster,

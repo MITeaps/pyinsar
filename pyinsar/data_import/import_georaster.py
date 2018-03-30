@@ -34,7 +34,7 @@ def open_georaster(georaster_path, read_only = True):
     @param georaster_path: Location of the georaster
     @param read_only: Determine if the georaster can be modified
     
-    @return The georaster as a GDAL data set.
+    @return The georaster as a GDAL data set
     '''
     read_status = GA_ReadOnly
     if read_only == False:
@@ -94,8 +94,8 @@ def get_georaster_extent(gdal_georaster):
     geotransform = gdal_georaster.GetGeoTransform()
     xmin = geotransform[0]
     ymax = geotransform[3]
-    xmax = xmin + geotransform[1]*georaster_x_size
-    ymin = ymax + geotransform[5]*georaster_y_size
+    xmax = xmin + geotransform[1]*georaster_x_size + geotransform[2]*georaster_y_size
+    ymin = ymax + geotransform[4]*georaster_x_size + geotransform[5]*georaster_y_size
     
     return (xmin, xmax, ymin, ymax)
 
