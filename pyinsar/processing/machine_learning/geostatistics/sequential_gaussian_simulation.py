@@ -199,13 +199,13 @@ def get_neighborhood(cell_index,
     neighborhood = [(-99999, -99999)]
     i_neighbor = 0
     while len(neighborhood) - 1 < max_number_data and i_neighbor < len(neighborhood_template):
-        j = cell_index[0] + neighborhood_template[i_neighbor][1]
-        i = cell_index[1] + neighborhood_template[i_neighbor][2]
+        j = int(cell_index[0] + neighborhood_template[i_neighbor][1])
+        i = int(cell_index[1] + neighborhood_template[i_neighbor][2])
         if (0 <= j < simulation_array.shape[0]
             and 0 <= i < simulation_array.shape[1]
-            and math.isnan(simulation_array[int(j), int(i)]) == False
-            and simulation_array[int(j), int(i)] != no_data_value):
-            neighborhood.append((int(j), int(i)))
+            and math.isnan(simulation_array[j, i]) == False
+            and simulation_array[j, i] != no_data_value):
+            neighborhood.append((j, i))
         i_neighbor += 1
     return neighborhood[1:]
 

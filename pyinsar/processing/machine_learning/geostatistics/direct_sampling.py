@@ -51,6 +51,7 @@ def compute_neighborhoods(simulation_array,
                           cell_j,
                           cell_i,
                           max_number_data,
+                          max_density_data,
                           neighborhood_shape,
                           rotation_angle_rad,
                           scaling_factor,
@@ -68,6 +69,8 @@ def compute_neighborhoods(simulation_array,
     @param cell_i: Index along the x axis of the central cell in the simulation grid
     @param max_number_data: The maximal number of data inside a neighborhood for
                             each variable
+    @param max_density_data: The maximal density of data inside a neighborhood
+                             for each variable
     @param neighborhood_shape: The maximal coverage of the neighborhood along
                                each axis
     @param rotation_angle_rad: The rotation to apply to each neighborhood (in radian)
@@ -81,15 +84,11 @@ def compute_neighborhoods(simulation_array,
     m = 1
     j = 1
     i = 0
-    neighbor_indexes = np.full((simulation_array.shape[0],
-                                np.max(max_number_data),
-                                2),
-                               no_data_value,
-                               dtype = np.int64)
-    neighbor_values = np.full((simulation_array.shape[0],
-                               np.max(max_number_data)),
-                              no_data_value,
-                              dtype = np.float64)
+    pre_neighbor_indexes = np.full((simulation_array.shape[0],
+                                    np.max(max_number_data),
+                                    2),
+                                   no_data_value,
+                                   dtype = np.int64)
     loop_indexes = np.zeros(simulation_array.shape[0], dtype = np.int32)
     array_size = simulation_array.shape[1]*simulation_array.shape[2]
     while (is_any_inferior(loop_indexes, max_number_data)
@@ -105,11 +104,8 @@ def compute_neighborhoods(simulation_array,
                         if (loop_indexes[k] < max_number_data[k]
                             and math.isnan(simulation_array[k, j + cell_j, i + cell_i]) == False
                             and simulation_array[k, j + cell_j, i + cell_i] != no_data_value):
-                            neighbor_indexes[k, loop_indexes[k], 0] = round((j*math.cos(-rotation_angle_rad)
-                                                                             - i*math.sin(-rotation_angle_rad))/scaling_factor[0])
-                            neighbor_indexes[k, loop_indexes[k], 1] = round((j*math.sin(-rotation_angle_rad)
-                                                                             + i*math.cos(-rotation_angle_rad))/scaling_factor[1])
-                            neighbor_values[k, loop_indexes[k]] = simulation_array[k, j + cell_j, i + cell_i]
+                            pre_neighbor_indexes[k, loop_indexes[k], 0] = j
+                            pre_neighbor_indexes[k, loop_indexes[k], 1] = i
                             loop_indexes[k] += 1
                 number_cells += 1
             j += d
@@ -124,16 +120,33 @@ def compute_neighborhoods(simulation_array,
                         if (loop_indexes[k] < max_number_data[k]
                             and math.isnan(simulation_array[k, j + cell_j, i + cell_i]) == False
                             and simulation_array[k, j + cell_j, i + cell_i] != no_data_value):
-                            neighbor_indexes[k, loop_indexes[k], 0] = round((j*math.cos(-rotation_angle_rad)
-                                                                             - i*math.sin(-rotation_angle_rad))/scaling_factor[0])
-                            neighbor_indexes[k, loop_indexes[k], 1] = round((j*math.sin(-rotation_angle_rad)
-                                                                             + i*math.cos(-rotation_angle_rad))/scaling_factor[1])
-                            neighbor_values[k, loop_indexes[k]] = simulation_array[k, j + cell_j, i + cell_i]
+                            pre_neighbor_indexes[k, loop_indexes[k], 0] = j
+                            pre_neighbor_indexes[k, loop_indexes[k], 1] = i
                             loop_indexes[k] += 1
                 number_cells += 1
             i += d
         d *= -1
         m += 1
+        
+    neighbor_indexes = np.full(pre_neighbor_indexes.shape,
+                               no_data_value,
+                               dtype = np.int64)
+    neighbor_values = np.full((pre_neighbor_indexes.shape[0],
+                               pre_neighbor_indexes.shape[1]),
+                              no_data_value,
+                              dtype = np.float64)
+    for k in range(pre_neighbor_indexes.shape[0]):
+        step = 1
+        if loop_indexes[k]/max_number_data[k] > max_density_data[k]:
+            step = int(1/max_density_data[k])
+        for i in range(loop_indexes[k]):
+            neighbor_indexes[k, i, 0] = round((pre_neighbor_indexes[k, i*step, 0]*math.cos(-rotation_angle_rad)
+                                               - pre_neighbor_indexes[k, i*step, 1]*math.sin(-rotation_angle_rad))/scaling_factor[0])
+            neighbor_indexes[k, i, 1] = round((pre_neighbor_indexes[k, i*step, 0]*math.sin(-rotation_angle_rad)
+                                               + pre_neighbor_indexes[k, i*step, 1]*math.cos(-rotation_angle_rad))/scaling_factor[1])
+            neighbor_values[k, i] = simulation_array[k,
+                                                     pre_neighbor_indexes[k, i*step, 0] + cell_j,
+                                                     pre_neighbor_indexes[k, i*step, 1] + cell_i]
 
     return neighbor_indexes, neighbor_values
 
@@ -417,7 +430,8 @@ def run_ds(data_array,
            variable_types,
            distance_thresholds,
            ti_fraction,
-           max_number_data = 10,
+           max_number_data,
+           max_density_data,
            neighborhood_shape = (math.inf, math.inf),
 #            delta = 0.,
            rotation_angle_array = np.empty((1, 1)),
@@ -449,6 +463,8 @@ def run_ds(data_array,
                         covered
     @param max_number_data: The maximal number of data inside a neighborhood for
                             each variable
+    @param max_density_data: The maximal density of data inside a neighborhood
+                             for each variable
     @param neighborhood_shape: The maximal coverage of the neighborhood along
                                each axis
     @param rotation_angle_array: A NumPy array describing the rotation to apply
@@ -471,10 +487,12 @@ def run_ds(data_array,
     assert data_array.shape[0] == training_image_array.shape[0], "The data and training image arrays should have the same number of variables"
     assert (len(variable_types) == training_image_array.shape[0]
             and len(distance_thresholds) == training_image_array.shape[0]
-            and len(max_number_data) == training_image_array.shape[0]), "variable_types, distance_thresholds, and max_number_data should match the number of variables in the training image"
+            and len(max_number_data) == training_image_array.shape[0]
+            and len(max_density_data) == training_image_array.shape[0]), "variable_types, distance_thresholds, max_number_data, and max_density_data should match the number of variables in the training image"
     for i in range(len(distance_thresholds)):
         assert (0. < distance_thresholds[i] <= 1.), "Distance threshold(s) must be between (0., 1.]"
         assert max_number_data[i] >= 0, "Number(s) of data must be positive"
+        assert 0. < max_density_data[i] <= 1., "Density(ies) of data must be between 0 and 1"
     assert len(neighborhood_shape) == 2, "Neighborhood shape must be two-dimensional"
     if rotation_angle_array.shape != data_array.shape[-2:]:
         rotation_angle_array = np.full(data_array.shape[-2:], 0.)
@@ -518,6 +536,7 @@ def run_ds(data_array,
                                                                               cell_j,
                                                                               cell_i,
                                                                               factored_max_number_data,
+                                                                              max_density_data,
                                                                               neighborhood_shape,
                                                                               rotation_angle_array[cell_j, cell_i],
                                                                               scaling_factor_array[:, cell_j, cell_i],
@@ -548,6 +567,7 @@ def simulate_ds_realization(data_array,
                             distance_thresholds,
                             ti_fraction,
                             max_number_data,
+                            max_density_data,
                             neighborhood_shape,
                             rotation_angle_array,
                             scaling_factor_array,
@@ -576,6 +596,8 @@ def simulate_ds_realization(data_array,
                         covered
     @param max_number_data: The maximal number of data inside a neighborhood for
                             each variable
+    @param max_density_data: The maximal density of data inside a neighborhood
+                             for each variable
     @param neighborhood_shape: The maximal coverage of the neighborhood along
                                each axis
     @param rotation_angle_array: A NumPy array describing the rotation to apply
@@ -620,6 +642,7 @@ def simulate_ds_realization(data_array,
                                                                           cell_j,
                                                                           cell_i,
                                                                           factored_max_number_data,
+                                                                          max_density_data,
                                                                           neighborhood_shape,
                                                                           rotation_angle_array[cell_j, cell_i],
                                                                           scaling_factor_array[:, cell_j, cell_i],
@@ -647,7 +670,8 @@ def run_parallel_ds(data_array,
                     variable_types,
                     distance_thresholds,
                     ti_fraction,
-                    max_number_data = 10,
+                    max_number_data,
+                    max_density_data,
                     neighborhood_shape = np.full(2, math.inf),
                     rotation_angle_array = np.empty((1, 1)),
                     scaling_factor_array = np.empty((1, 1, 1)),
@@ -679,6 +703,8 @@ def run_parallel_ds(data_array,
                         covered
     @param max_number_data: The maximal number of data inside a neighborhood for
                             each variable
+    @param max_density_data: The maximal density of data inside a neighborhood
+                             for each variable
     @param neighborhood_shape: The maximal coverage of the neighborhood along
                                each axis
     @param rotation_angle_array: A NumPy array describing the rotation to apply
@@ -701,10 +727,12 @@ def run_parallel_ds(data_array,
     assert data_array.shape[0] == training_image_array.shape[0], "The data and training image arrays should have the same number of variables"
     assert (len(variable_types) == training_image_array.shape[0]
             and len(distance_thresholds) == training_image_array.shape[0]
-            and len(max_number_data) == training_image_array.shape[0]), "variable_types, distance_thresholds, and max_number_data should match the number of variables in the training image"
+            and len(max_number_data) == training_image_array.shape[0]
+            and len(max_density_data) == training_image_array.shape[0]), "variable_types, distance_thresholds, max_number_data, and max_density_data should match the number of variables in the training image"
     for i in range(len(distance_thresholds)):
         assert (0. < distance_thresholds[i] <= 1.), "Distance threshold(s) must be between (0., 1.]"
         assert max_number_data[i] >= 0, "Number(s) of data must be positive"
+        assert 0. < max_density_data[i] <= 1., "Density(ies) of data must be between 0 and 1"
     assert len(neighborhood_shape) == 2, "Neighborhood shape must be two-dimensional"
     if rotation_angle_array.shape != data_array.shape[-2:]:
         rotation_angle_array = np.full(data_array.shape[-2:], 0.)
@@ -729,6 +757,7 @@ def run_parallel_ds(data_array,
                                                           distance_thresholds,
                                                           ti_fraction,
                                                           max_number_data,
+                                                          max_density_data,
                                                           neighborhood_shape,
                                                           rotation_angle_array,
                                                           scaling_factor_array,
