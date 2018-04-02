@@ -279,7 +279,6 @@ def retrieveAzimuthTime(in_tree):
         end_index = (index+1)*lines_per_burst
         index_slice = slice(start_index,  end_index)
 
-        first_valid_samples = burst.find('firstValidSample')    
         start_date = pd.to_datetime(burst.find('azimuthTime').text)
         date_offsets = pd.to_timedelta(np.arange(lines_per_burst) * azimuth_time_interval, 's')
         azimuth_time[index_slice] = start_date + date_offsets
