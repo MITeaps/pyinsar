@@ -2,12 +2,21 @@
 from collections import OrderedDict
 
 # 3rd party imports
+import cv2
 import numpy as np
 import pandas as pd
+
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter('ignore', FutureWarning)
+    import statsmodels.api as sm
+
 from scipy.signal import convolve
 from scipy.interpolate import interp1d
 from geodesy import wgs84
-import numpy as np
+from sklearn.linear_model import RANSACRegressor
+
+
 
 def phaseShift(data, phase):
     '''
@@ -124,3 +133,82 @@ def coherence(s1, s2, window, topo_phase = 0):
 
     return numerator / denominator
 
+
+def scaleImage(input_data, vmin=None, vmax=None):
+
+    if vmin==None or vmax==None:
+        stddev = sm.robust.mad(input_data.ravel())
+        middle = np.median(input_data.ravel())
+
+    if vmin == None:
+        vmin = middle - 1*stddev
+
+    if vmax == None:
+        vmax = middle + 1*stddev
+
+    input_data = input_data.astype(np.float)
+    input_data[input_data<vmin] = vmin
+    input_data[input_data>vmax] = vmax
+
+    input_data = np.round((input_data - vmin) * 255 / (vmax-vmin)).astype(np.uint8)
+
+    return input_data
+
+
+def keypointsAlign(img1, img2, max_matches=40, invert=True):
+
+    def buildMatchedPoints(in_matches, query_kp, train_kp):
+        query_index = [match.queryIdx for match in in_matches]
+        train_index = [match.trainIdx for match in in_matches]
+
+        sorted_query_kp = [query_kp[i] for i in query_index]
+        sorted_train_kp = [train_kp[i] for i in train_index]
+
+
+        query_positions = [[kp.pt[0], kp.pt[1]] for kp in sorted_query_kp]
+        train_positions = [[kp.pt[0], kp.pt[1]] for kp in sorted_train_kp]
+
+        return query_positions, train_positions
+
+    orb = cv2.ORB.create()
+    slc1_keypoints = orb.detectAndCompute(img1, None)
+    slc2_keypoints = orb.detectAndCompute(img2, None)
+
+    bfmatcher = cv2.BFMatcher_create(cv2.NORM_HAMMING, crossCheck=True)
+    matches = bfmatcher.match(slc1_keypoints[1], slc2_keypoints[1])
+
+    matches.sort(key=lambda x: x.distance)
+
+    cut_matches = matches[:max_matches]
+    s1_coords, s2_coords = buildMatchedPoints(cut_matches, slc1_keypoints[0], slc2_keypoints[0])
+
+    s1_coords = pd.DataFrame(s1_coords, columns=['Range','Azimuth'])
+    s2_coords = pd.DataFrame(s2_coords, columns=['Range','Azimuth'])
+
+    distances = pd.Series([mp.distance for mp in cut_matches],name='Distance')
+
+    rg_res = sm.WLS(s2_coords['Range'],sm.add_constant(s1_coords.loc[:,['Range']]),
+                weights=1.0/distances**2).fit()
+
+    ransac_range = RANSACRegressor()
+    ransac_range.fit(s1_coords.loc[:,['Range']], s2_coords.loc[:,['Range']])
+    rg_scale = ransac_range.estimator_.coef_[0].item()
+    rg_const = ransac_range.estimator_.intercept_
+
+    ransac_azimuth = RANSACRegressor()
+    ransac_azimuth.fit(s1_coords.loc[:,['Azimuth']], s2_coords.loc[:,['Azimuth']])
+    az_scale = ransac_azimuth.estimator_.coef_[0].item()
+    az_const = ransac_azimuth.estimator_.intercept_
+
+    az_res = sm.WLS(s2_coords['Azimuth'],sm.add_constant(s1_coords.loc[:,['Azimuth']]),
+                     weights=1.0/distances**2).fit()
+
+    transformation_matrix = np.array([[rg_scale, 0,        rg_const],
+                                      [0,        az_scale, az_const],
+                                      [0,        0,        1]])
+
+    if invert==True:
+        transformation_matrix = np.linalg.inv(transformation_matrix)
+
+
+    return(transformation_matrix[:2,:])
