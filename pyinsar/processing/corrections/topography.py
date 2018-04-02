@@ -1,3 +1,6 @@
+import numpy as np
+from geodesy import wgs84
+
 def ellipsoidalEarthSlantRanges(azimuth_time, latlon, orbit_interp,
                          start_x, end_x, start_y, end_y):
     '''
@@ -16,7 +19,7 @@ def ellipsoidalEarthSlantRanges(azimuth_time, latlon, orbit_interp,
 
     geo_to_cart = np.vectorize(wgs84.geodesic_to_cartesian)
 
-    x,y = np.meshgrid(np.arange(start_x, end_x),np.arange(start_y, end_y))
+    x,y = np.meshgrid(np.arange(start_x, end_x), np.arange(start_y, end_y))
 
     lat, lon = latlon(y,x)
 
