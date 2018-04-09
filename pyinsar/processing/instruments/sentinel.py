@@ -186,14 +186,6 @@ class SentinelRamp(object):
         self._doppler_centroid_frequency_list = list(map(self._dopplerCentroidFrequency, doppler_centroid_list))
 
         
-#     def __call__(self, lines, samples, invert=False):
-        
-#         piecewise_functions = [lambda lines, samples: self._derampedPhase(lines, samples, index) for index in range(self._num_bursts)]
-        
-#         np.piecewise()
-        
-        
-#    def _derampedPhase(self, lines, samples, index):
     def __call__(self, lines, samples, index):
         '''
         Calculate the phase change from the Sentinel ramp and modulation
