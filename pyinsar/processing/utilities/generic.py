@@ -59,7 +59,7 @@ class OrbitInterpolation(object):
 
         self._orbit_data = orbit_data
         if time_name == None:
-            self._start_date = self_orbit_data.index[0]
+            self._start_date = self._orbit_data.index[0]
             self._elapsed_time = (self._orbit_data.index - self._start_date).total_seconds()
 
         else:
