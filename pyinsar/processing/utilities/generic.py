@@ -83,7 +83,7 @@ class OrbitInterpolation(object):
             self._interp_functions[label] = interp1d(self._elapsed_time, self._orbit_data[label], 'cubic')
 
 
-    def __call__(self, in_time):
+    def __call__(self, in_time, in_datetime=True):
         '''
         Compute the satellites position or velocity
 
@@ -92,7 +92,10 @@ class OrbitInterpolation(object):
         @return Satellite position or velocity at in_time
         '''
 
-        elapsed_time = (in_time - self._start_date) / pd.to_timedelta(1,'s')
+        if in_datetime:
+            elapsed_time = (in_time - self._start_date) / pd.to_timedelta(1,'s')
+        else:
+            elapsed_time = in_time
 
         results = []
 
@@ -102,7 +105,7 @@ class OrbitInterpolation(object):
                 tmp_res = tmp_res.reshape(-1)[0]
             results.append(tmp_res)
 
-        return results
+        return np.array(results)
 
 
 def coherence(s1, s2, window, topo_phase = 0):
