@@ -111,7 +111,7 @@ def selectValidLines(data, tree,cut=True):
 
     return burst_list
 
-class DerampPolynomial(object):
+class RampPolynomial(object):
     '''
     Polynomial used for quantities relating to deramping sentinel
     '''
@@ -249,7 +249,7 @@ class SentinelRamp(object):
         doppler_fm_rate_t0 = float(az_fm_rate.find('t0').text)
         doppler_fm_rate_coeffs = [float(az_fm_rate.find(label).text) for label in ['c0','c1','c2']]
         
-        return DerampPolynomial(doppler_fm_rate_t0, 
+        return RampPolynomial(doppler_fm_rate_t0,
                                 doppler_fm_rate_coeffs, 
                                 self._slant_range_time_interval,
                                 self._slant_range_time)
@@ -282,7 +282,7 @@ class SentinelRamp(object):
         '''
         doppler_centroid_coeffs = [float(poly) for poly in doppler_centroid_estimate.find('dataDcPolynomial').text.split(' ')]
         doppler_centroid_t0 = float(doppler_centroid_estimate.find('t0').text)
-        return DerampPolynomial(doppler_centroid_t0, 
+        return RampPolynomial(doppler_centroid_t0,
                           doppler_centroid_coeffs,
                           self._slant_range_time_interval,
                           self._slant_range_time)
