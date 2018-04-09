@@ -12,7 +12,7 @@ def N_h(h, P, T, RH, k1=77.6, k2=23.3, k3=3.75E5):
     return N(P(h), T(h), RH(h), k1, k2, k3)
 
 
-def computeDelays(h, P, T, RH):
+def compute_delays(h, P, T, RH):
     pressure = CubicSpline(h, P, bc_type='natural', extrapolate=True)
     temperature = CubicSpline(h, T+273.15, bc_type='natural', extrapolate=True)
     rh_index = ~pd.isnull(RH)

@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 # 3rd party imports
 import pandas as pd
 
-def parseSatelliteData(in_satellite_file):
+def parse_satellite_data(in_satellite_file):
     '''
     Parse Sentinel satelllite data
 

@@ -25,7 +25,7 @@
 import re
 from collections import OrderedDict
 
-def readUAVSARMetadata(in_file):
+def read_uavsar_metadata(in_file):
     '''
     Parse UAVSAR metadata
 

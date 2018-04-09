@@ -18,7 +18,7 @@ from sklearn.linear_model import RANSACRegressor
 
 
 
-def phaseShift(data, phase):
+def phase_shift(data, phase):
     '''
      Apply a phase shift to data
 
@@ -30,7 +30,7 @@ def phaseShift(data, phase):
     return  (data.real*np.cos(phase) + data.imag*np.sin(phase)) \
             + 1j*(-data.real*np.sin(phase) + data.imag*np.cos(phase))
 
-def findClosestTime(time, date):
+def find_closest_time(time, date):
     '''
     Find the closest time to a date
 
@@ -137,7 +137,7 @@ def coherence(s1, s2, window, topo_phase = 0):
     return numerator / denominator
 
 
-def scaleImage(input_data, vmin=None, vmax=None):
+def scale_image(input_data, vmin=None, vmax=None):
 
     if vmin==None or vmax==None:
         stddev = sm.robust.mad(input_data.ravel())
@@ -158,7 +158,7 @@ def scaleImage(input_data, vmin=None, vmax=None):
     return input_data
 
 
-def keypointsAlign(img1, img2, max_matches=40, invert=True):
+def keypoints_align(img1, img2, max_matches=40, invert=True):
 
     def buildMatchedPoints(in_matches, query_kp, train_kp):
         query_index = [match.queryIdx for match in in_matches]

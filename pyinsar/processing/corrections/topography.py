@@ -1,8 +1,8 @@
 import numpy as np
 from geodesy import wgs84
 
-def ellipsoidalEarthSlantRanges(azimuth_time, latlon, orbit_interp,
-                         start_x, end_x, start_y, end_y):
+def ellipsoidal_earth_slant_ranges(azimuth_time, latlon, orbit_interp,
+                                   start_x, end_x, start_y, end_y):
     '''
     Compute slant ranges assuming no topography
 

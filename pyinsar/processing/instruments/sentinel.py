@@ -1,5 +1,5 @@
 # Package imports
-from pyinsar.processing.utilities.generic import phaseShift, findClosestTime, OrbitInterpolation
+from pyinsar.processing.utilities.generic import phase_shift, find_closest_time, OrbitInterpolation
 
 # Standard library imports
 from collections import OrderedDict
@@ -12,7 +12,7 @@ import pandas as pd
 from scipy.constants import c
 
 
-def transformSLC(slc, deramped_phase, transformation_matrix):
+def transform_slc(slc, deramped_phase, transformation_matrix):
     '''
     @param slc: Input slc
     @param ramp_phase: Phase to be removed before the transformation and to be readded afterwards
@@ -22,14 +22,14 @@ def transformSLC(slc, deramped_phase, transformation_matrix):
     '''
     deramped_shifted = cv2.warpAffine(deramped_phase, transformation_matrix, None, cv2.INTER_LANCZOS4)
     
-    deramped_slc = phaseShift(slc, deramped_phase)
+    deramped_slc = phase_shift(slc, deramped_phase)
 
     burst_slc_shifted =      cv2.warpAffine(deramped_slc.real, transformation_matrix, None, cv2.INTER_LANCZOS4) \
                         + 1j*cv2.warpAffine(deramped_slc.imag, transformation_matrix, None, cv2.INTER_LANCZOS4)
         
-    return phaseShift(burst_slc_shifted, -deramped_shifted), deramped_shifted
+    return phase_shift(burst_slc_shifted, -deramped_shifted), deramped_shifted
 
-def findOverlappingValidLines(metadata_tree):
+def find_overlapping_valid_lines(metadata_tree):
     '''
     Determine which lines between bursts overlap
 
@@ -40,8 +40,8 @@ def findOverlappingValidLines(metadata_tree):
 
     burst_info_list = metadata_tree.findall('swathTiming/burstList/burst')
     lines_per_burst = int(metadata_tree.find('swathTiming/linesPerBurst').text)
-    valid_lines = getValidLines(metadata_tree)
-    times, line_index, split_index = retrieveAzimuthTime(metadata_tree)
+    valid_lines = get_valid_lines(metadata_tree)
+    times, line_index, split_index = retrieve_azimuth_time(metadata_tree)
 
     indices = []
 
@@ -51,15 +51,15 @@ def findOverlappingValidLines(metadata_tree):
 
         valid_burst_end_index = (burst_start_index-1) - np.argmax(valid_lines[:burst_start_index-1][::-1])
 
-        start_index = findClosestTime( times[:burst_start_index], times[valid_burst_start_index] )
-        end_index = findClosestTime( times[burst_start_index:], times[valid_burst_end_index] )
+        start_index = find_closest_time(times[:burst_start_index], times[valid_burst_start_index])
+        end_index = find_closest_time(times[burst_start_index:], times[valid_burst_end_index])
 
         indices.append( ((start_index, valid_burst_end_index), (valid_burst_start_index, end_index)) )
 
     return indices
 
 
-def getValidLines(metadata_tree, per_burst = False):
+def get_valid_lines(metadata_tree, per_burst = False):
     '''
     Retrieve all lines that contain some valid data
 
@@ -87,7 +87,7 @@ def getValidLines(metadata_tree, per_burst = False):
         return np.array(valid_lines) != -1
 
 
-def selectValidLines(data, tree,cut=True):
+def select_valid_lines(data, tree, cut=True):
     '''
     Extract burst information from SLC
 
@@ -181,9 +181,9 @@ class SentinelRamp(object):
         self._slant_range_time = float(tree.find('imageAnnotation/imageInformation/slantRangeTime').text)
         self._slant_range_time_interval = 1/float(tree.find('generalAnnotation/productInformation/rangeSamplingRate').text)
         
-        self._doppler_centroid_scanning_rate_list = list(map(self._dopplerCentroidRate, burst_list))
-        self._doppler_fm_rate_list = list(map(self._dopplerFMRate, az_fm_rate_list))
-        self._doppler_centroid_frequency_list = list(map(self._dopplerCentroidFrequency, doppler_centroid_list))
+        self._doppler_centroid_scanning_rate_list = list(map(self._doppler_centroid_rate, burst_list))
+        self._doppler_fm_rate_list = list(map(self._doppler_fm_rate, az_fm_rate_list))
+        self._doppler_centroid_frequency_list = list(map(self._doppler_centroid_frequency, doppler_centroid_list))
 
         
     def __call__(self, lines, samples, index):
@@ -196,16 +196,16 @@ class SentinelRamp(object):
 
         @return Phase due to ramp and modulation
         '''
-        centroid_tops = self._dopplerCentroidTops(samples, 
-                                                  self._doppler_fm_rate_list[index], 
-                                                  self._doppler_centroid_scanning_rate_list[index])
+        centroid_tops = self._doppler_centroid_tops(samples,
+                                                    self._doppler_fm_rate_list[index],
+                                                    self._doppler_centroid_scanning_rate_list[index])
         
         doppler_centroid_frequency_func = self._doppler_centroid_frequency_list[index]
         
-        zero_doppler_azimuth_time = self._zeroDopplerAzimuthTime(lines)
-        ref_zero_doppler_azimuth_time = self._referenceZeroDopplerAzimuthTime(samples,
-                                                                              doppler_centroid_frequency_func,
-                                                                              self._doppler_fm_rate_list[index])
+        zero_doppler_azimuth_time = self._zero_doppler_azimuth_time(lines)
+        ref_zero_doppler_azimuth_time = self._reference_zero_doppler_azimuth_time(samples,
+                                                                                  doppler_centroid_frequency_func,
+                                                                                  self._doppler_fm_rate_list[index])
         
         doppler_centroid_frequency = doppler_centroid_frequency_func(samples)
         
@@ -213,7 +213,7 @@ class SentinelRamp(object):
                - 2*np.pi * doppler_centroid_frequency * (zero_doppler_azimuth_time - ref_zero_doppler_azimuth_time)
 
         
-    def _dopplerCentroidRate(self, burst):
+    def _doppler_centroid_rate(self, burst):
         '''
         Generate a function to calculate doppler centroid rate from scanning the antenna
 
@@ -230,7 +230,7 @@ class SentinelRamp(object):
 
         return self._az_steering_rate * 2 * speed / self._radar_lambda
     
-    def _dopplerFMRate(self, az_fm_rate):
+    def _doppler_fm_rate(self, az_fm_rate):
         '''
         Generate a function for calculating the doppler FM rate
 
@@ -242,11 +242,11 @@ class SentinelRamp(object):
         doppler_fm_rate_coeffs = [float(az_fm_rate.find(label).text) for label in ['c0','c1','c2']]
         
         return RampPolynomial(doppler_fm_rate_t0,
-                                doppler_fm_rate_coeffs, 
+                                doppler_fm_rate_coeffs,
                                 self._slant_range_time_interval,
                                 self._slant_range_time)
     
-    def _dopplerCentroidTops(self, samples, doppler_fm_rate, doppler_centroid_rate_from_scanning_antenna):
+    def _doppler_centroid_tops(self, samples, doppler_fm_rate, doppler_centroid_rate_from_scanning_antenna):
         '''
         Generate a function for computing the centroid rate in TOPS data
 
@@ -264,7 +264,7 @@ class SentinelRamp(object):
         
         
         
-    def _dopplerCentroidFrequency(self, doppler_centroid_estimate):
+    def _doppler_centroid_frequency(self, doppler_centroid_estimate):
         '''
         Functino for computing the dopplber centroid frequency
 
@@ -280,7 +280,7 @@ class SentinelRamp(object):
                           self._slant_range_time)
     
     
-    def _zeroDopplerAzimuthTime(self, lines):
+    def _zero_doppler_azimuth_time(self, lines):
         '''
         Calculates the zero doppler azimuth time for a line 
 
@@ -293,7 +293,7 @@ class SentinelRamp(object):
         
         return lines*self._az_time_interval - self._az_time_interval * self._lines_per_burst/2
         
-    def _referenceZeroDopplerAzimuthTime(self, samples, doppler_centroid_frequency, doppler_fm_rate):
+    def _reference_zero_doppler_azimuth_time(self, samples, doppler_centroid_frequency, doppler_fm_rate):
         '''
         Beam crossing time for a given range
 
@@ -305,7 +305,7 @@ class SentinelRamp(object):
         return beam_center_crossing_time(samples) - beam_center_crossing_time(0)
     
 
-def retrieveAzimuthTime(in_tree):
+def retrieve_azimuth_time(in_tree):
     '''
     Retrieves the zero azimuth time for all the lines in the data
 
@@ -333,10 +333,10 @@ def retrieveAzimuthTime(in_tree):
         date_offsets = pd.to_timedelta((np.arange(lines_per_burst) * azimuth_time_interval)*1e9, 'ns')
         azimuth_time[index_slice] = start_date + date_offsets
         if index != 0:
-            starting_indicies = [findClosestTime(azimuth_time[:start_index], start_date), start_index]
+            starting_indicies = [find_closest_time(azimuth_time[:start_index], start_date), start_index]
             first_overlap_indicies.append(starting_indicies)
             previous_burst_split = int(round(np.average([starting_indicies[0], start_index-1])))
-            current_burst_split = findClosestTime(azimuth_time[start_index:], azimuth_time[previous_burst_split])
+            current_burst_split = find_closest_time(azimuth_time[start_index:], azimuth_time[previous_burst_split])
 
             split_indicies.append([previous_burst_split, current_burst_split])
         
@@ -351,7 +351,7 @@ def retrieveAzimuthTime(in_tree):
     return azimuth_time, line_index, split_indicies
 
 
-def readGeoLocation(tree):
+def read_geolocation(tree):
     '''
     Read in geolocation data
 
@@ -388,13 +388,13 @@ def readGeoLocation(tree):
 
     return results
 
-def updateGeolocationLines(tree, azimuth_times, geolocation_data):
+def update_geolocation_lines(tree, azimuth_times, geolocation_data):
     '''
     Update which line is associated with geolocation data using azimuth times
 
     @param tree: Sentinel XML metadata
     @param azimuth_times: Azimuth times
-    @param geolocation_data: Geolocation data read in by readGeoLocation
+    @param geolocation_data: Geolocation data read in by read_geolocation
 
     @return New lines for the geolocation data
     '''
@@ -405,8 +405,8 @@ def updateGeolocationLines(tree, azimuth_times, geolocation_data):
     lines = np.zeros_like(geolocation_data['Lines'])
 
     for index, (az_time, sample) in enumerate(zip(geolocation_data['Azimuth Times'],geolocation_data['Samples'])):
-        lines[index] = findClosestTime(azimuth_times,
-                                       az_time - pd.to_timedelta((sample * range_sampling_interval/2) * 1e9, 'ns'))
+        lines[index] = find_closest_time(azimuth_times,
+                                         az_time - pd.to_timedelta((sample * range_sampling_interval/2) * 1e9, 'ns'))
 
     return lines
 
