@@ -30,6 +30,13 @@ def transformSLC(slc, deramped_phase, transformation_matrix):
     return phaseShift(burst_slc_shifted, -deramped_shifted), deramped_shifted
 
 def findOverlappingValidLines(metadata_tree):
+    '''
+    Determine which lines between bursts overlap
+
+    @param metadata_tree: Sentinel metadata XML tree
+
+    @return List of overlapping index ranges
+    '''
 
     burst_info_list = metadata_tree.findall('swathTiming/burstList/burst')
     lines_per_burst = int(metadata_tree.find('swathTiming/linesPerBurst').text)
@@ -53,6 +60,15 @@ def findOverlappingValidLines(metadata_tree):
 
 
 def getValidLines(metadata_tree, per_burst = False):
+    '''
+    Retrieve all lines that contain some valid data
+
+    @param metadata_tree: Sentinel XML metadata tree
+    @param per_burst: Retrieve the burst data as seperate arrays
+
+    @return Sentinel data for all lines that are valid
+    '''
+
     burst_info_list = metadata_tree.findall('swathTiming/burstList/burst')
     lines_per_burst = int(metadata_tree.find('swathTiming/linesPerBurst').text)
 
@@ -381,7 +397,15 @@ def readGeoLocation(tree):
     return results
 
 def updateGeolocationLines(tree, azimuth_times, geolocation_data):
+    '''
+    Update which line is associated with geolocation data using azimuth times
 
+    @param tree: Sentinel XML metadata
+    @param azimuth_times: Azimuth times
+    @param geolocation_data: Geolocation data read in by readGeoLocation
+
+    @return New lines for the geolocation data
+    '''
     range_sampling_interval = 1/float(tree.find('generalAnnotation/productInformation/rangeSamplingRate').text)
 
     azimuth_times = azimuth_times.reset_index(drop=True)
