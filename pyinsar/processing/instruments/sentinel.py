@@ -29,6 +29,48 @@ def transformSLC(slc, deramped_phase, transformation_matrix):
         
     return phaseShift(burst_slc_shifted, -deramped_shifted), deramped_shifted
 
+def findOverlappingValidLines(metadata_tree):
+
+    burst_info_list = metadata_tree.findall('swathTiming/burstList/burst')
+    lines_per_burst = int(metadata_tree.find('swathTiming/linesPerBurst').text)
+    valid_lines = getValidLines(metadata_tree)
+    times, line_index, split_index = retrieveAzimuthTime(metadata_tree)
+
+    indices = []
+
+    for index in range(1,len(burst_info_list)):
+        burst_start_index = lines_per_burst * index
+        valid_burst_start_index = burst_start_index + np.argmax(valid_lines[burst_start_index:])
+
+        valid_burst_end_index = (burst_start_index-1) - np.argmax(valid_lines[:burst_start_index-1][::-1])
+
+        start_index = findClosestTime( times[:burst_start_index], times[valid_burst_start_index] )
+        end_index = findClosestTime( times[burst_start_index:], times[valid_burst_end_index] )
+
+        indices.append( ((start_index, valid_burst_end_index), (valid_burst_start_index, end_index)) )
+
+    return indices
+
+
+def getValidLines(metadata_tree, per_burst = False):
+    burst_info_list = metadata_tree.findall('swathTiming/burstList/burst')
+    lines_per_burst = int(metadata_tree.find('swathTiming/linesPerBurst').text)
+
+    valid_lines = []
+
+    for burst in burst_info_list:
+        valid_lines_in_burst = [int(val) for val in burst.find('firstValidSample').text.split(' ')]
+        if per_burst:
+            valid_lines.append(np.array(valid_lines_in_burst) != -1)
+        else:
+            valid_lines += valid_lines_in_burst
+
+    if per_burst:
+        return valid_lines
+    else:
+        return np.array(valid_lines) != -1
+
+
 def selectValidLines(data, tree,cut=True):
     '''
     Extract burst information from SLC
