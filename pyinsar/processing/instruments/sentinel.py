@@ -322,7 +322,7 @@ def retrieveAzimuthTime(in_tree):
         index_slice = slice(start_index,  end_index)
 
         start_date = pd.to_datetime(burst.find('azimuthTime').text)
-        date_offsets = pd.to_timedelta(np.arange(lines_per_burst) * azimuth_time_interval, 's')
+        date_offsets = pd.to_timedelta((np.arange(lines_per_burst) * azimuth_time_interval)*1e9, 'ns')
         azimuth_time[index_slice] = start_date + date_offsets
         if index != 0:
             starting_indicies = [findClosestTime(azimuth_time[:start_index], start_date), start_index]
@@ -343,36 +343,54 @@ def retrieveAzimuthTime(in_tree):
     return azimuth_time, line_index, split_indicies
 
 
-def readGeoLocation(in_geolocation_tree, azimuth_time):
+def readGeoLocation(tree):
     '''
     Read in geolocation data
 
-    @param in_geolocation_tree: ElementTree containing geolocation data
-    @param azimuth time: Azimuth time for each line
+    @param in_geolocation_tree: Sentinel metadata as an ElementTree
 
-    @return longitude information from metadata
+    @return Geolocation metadata
     '''
-    azimuth_time = azimuth_time.reset_index(drop=True)
-    num_entries = int(in_geolocation_tree.attrib['count'])
-    lines = np.zeros(num_entries)
-    samples = np.zeros(num_entries)
-    latitudes = np.zeros(num_entries)
-    longitudes = np.zeros(num_entries)
-    for index, point in enumerate(in_geolocation_tree):
-        lat = float(point.find('latitude').text)
-        lon = float(point.find('longitude').text)
-        sample = float(point.find('pixel').text)
-        time = pd.to_datetime(point.find('azimuthTime').text)
-        line = findClosestTime(azimuth_time, time)
-        lines[index] = line
-        samples[index] = sample
-        latitudes[index] = lat
-        longitudes[index] = lon
-        
+    geolocation_tree = tree.find('geolocationGrid/geolocationGridPointList')
+    num_entries = int(geolocation_tree.attrib['count'])
+
+    metadata_names = ['azimuthTime', 'slantRangeTime', 'line', 'pixel',
+                      'latitude', 'longitude', 'height', 'incidenceAngle',
+                      'elevationAngle']
+
+    new_metadata_names = ['Azimuth Times', 'Slant Range Times', 'Lines',
+                          'Samples', 'Latitudes', 'Longitudes', 'Heights',
+                          'Elevation Angle']
+
+    dtypes = ['datetime64[ns]', 'float', 'int', 'int', 'float', 'float',
+              'float', 'float']
+
+    conversions = [pd.to_datetime, float, int, int, float, float, float,
+                  float]
+
     results = OrderedDict()
-    results['Lines'] = lines
-    results['Samples'] = samples
-    results['Latitude'] = latitudes
-    results['Longitude'] = longitudes
+
+
+    for new_name, dtype in zip(new_metadata_names, dtypes):
+        results[new_name] = np.zeros(num_entries, dtype=dtype)
+
+    for index, point in enumerate(geolocation_tree):
+        for old_name, new_name, conversion in zip(metadata_names, new_metadata_names, conversions):
+            results[new_name][index] = conversion(point.find(old_name).text)
 
     return results
+
+def updateGeolocationLines(tree, azimuth_times, geolocation_data):
+
+    range_sampling_interval = 1/float(tree.find('generalAnnotation/productInformation/rangeSamplingRate').text)
+
+    azimuth_times = azimuth_times.reset_index(drop=True)
+
+    lines = np.zeros_like(geolocation_data['Lines'])
+
+    for index, (az_time, sample) in enumerate(zip(geolocation_data['Azimuth Times'],geolocation_data['Samples'])):
+        lines[index] = findClosestTime(azimuth_times,
+                                       az_time - pd.to_timedelta((sample * range_sampling_interval/2) * 1e9, 'ns'))
+
+    return lines
+
