@@ -1,1 +1,1 @@
-__all__ = ["export_georaster"]
+__all__ = ["export_georaster", "plot_raster"]

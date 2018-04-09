@@ -28,8 +28,13 @@ import random
 from enum import Enum
 from scipy.special import erfinv
 from scipy import stats
+# import concurrent.futures
 
 from numba import jit
+from numba import prange
+
+from pyinsar.processing.machine_learning.geostatistics.geostatistics_utils import PathType, unflatten_index, standardize
+from pyinsar.processing.machine_learning.geostatistics.variogram import *
 
 ################################################################################
 # Merging secondary data
@@ -66,21 +71,7 @@ def merge_secondary_data(secondary_data_array,
 # Sequential Gaussian Simulation (SGS)
 ################################################################################
 
-@jit(nopython = True)
-def unflatten_index(flattened_index, array_shape):
-    '''
-    Unflatten an index for a 2D array
-    
-    @param flattened_index: The flattened index (i.e., a single integer)
-    @param array_shape: The shape of the array for the two dimensions (j, i)
-    
-    @return The 2D index (j, i)
-    '''
-    j = int((flattened_index/array_shape[1])%array_shape[0])
-    i = int(flattened_index%array_shape[1])
-    return (j, i)
-
-@jit(nopython = True)
+@jit(nopython = True, nogil = True)
 def compute_euclidean_distance(cell_1, cell_2):
     '''
     Compute the 2D Euclidean distance
@@ -92,7 +83,7 @@ def compute_euclidean_distance(cell_1, cell_2):
     '''
     return math.sqrt((cell_1[0] - cell_2[0])**2 + (cell_1[1] - cell_2[1])**2)
 
-@jit(nopython = True)
+@jit(nopython = True, nogil = True)
 def compute_axis_aligned_ellipse_range(neighborhood_range, neighborhood_azimuth_rad):
     '''
     Compute the extent of an ellipse along the y and x axes
@@ -109,7 +100,7 @@ def compute_axis_aligned_ellipse_range(neighborhood_range, neighborhood_azimuth_
     vx = neighborhood_range[1]*math.sin(neighborhood_azimuth_rad + math.pi/2.)
     return (math.sqrt(uy**2 + vy**2), math.sqrt(ux**2 + vx**2))
 
-@jit(nopython = True)
+@jit(nopython = True, nogil = True)
 def compute_axis_aligned_neighborhood_shape(neighborhood_range,
                                             neighborhood_azimuth,
                                             grid_yx_spacing):
@@ -128,7 +119,7 @@ def compute_axis_aligned_neighborhood_shape(neighborhood_range,
     return (math.floor(y_aligned_range/grid_yx_spacing[0]),
             math.floor(x_aligned_range/grid_yx_spacing[1]))
 
-@jit(nopython = True)
+@jit(nopython = True, nogil = True)
 def compute_neighborhood_template(neighborhood_range,
                                   grid_yx_spacing,
                                   vario_models,
@@ -185,7 +176,7 @@ def compute_neighborhood_template(neighborhood_range,
 
     return sorted(neighborhood_template[1:]), correlation_template
 
-@jit(nopython = True)
+@jit(nopython = True, nogil = True)
 def get_neighborhood(cell_index,
                      simulation_array,
                      neighborhood_template,
@@ -208,117 +199,17 @@ def get_neighborhood(cell_index,
     neighborhood = [(-99999, -99999)]
     i_neighbor = 0
     while len(neighborhood) - 1 < max_number_data and i_neighbor < len(neighborhood_template):
-        j = cell_index[0] + neighborhood_template[i_neighbor][1]
-        i = cell_index[1] + neighborhood_template[i_neighbor][2]
+        j = int(cell_index[0] + neighborhood_template[i_neighbor][1])
+        i = int(cell_index[1] + neighborhood_template[i_neighbor][2])
         if (0 <= j < simulation_array.shape[0]
             and 0 <= i < simulation_array.shape[1]
-            and math.isnan(simulation_array[int(j), int(i)]) == False
-            and simulation_array[int(j), int(i)] != no_data_value):
-            neighborhood.append((int(j), int(i)))
+            and math.isnan(simulation_array[j, i]) == False
+            and simulation_array[j, i] != no_data_value):
+            neighborhood.append((j, i))
         i_neighbor += 1
     return neighborhood[1:]
 
-@jit(nopython = True)
-def nugget_variogram(reduced_distance, variance_contribution):
-    '''
-    Compute the value of a variogram with a pure nugget effect
-    
-    @param reduced_distance: The distance between the two points divided by the
-                             variogram range
-    @param variance_contribution: The variance for this variogram model
-    
-    @return The value of the variogram
-    '''
-    if reduced_distance == 0.:
-        return 0.
-    return variance_contribution
-@jit(nopython = True)
-def gaussian_variogram(reduced_distance, variance_contribution):
-    '''
-    Compute the value of a variogram with a Gaussian model
-    
-    @param reduced_distance: The distance between the two points divided by the
-                             variogram range
-    @param variance_contribution: The variance for this variogram model
-    
-    @return The value of the variogram
-    '''
-    return variance_contribution*(1. - math.exp(-3*reduced_distance**2))
-@jit(nopython = True)
-def spherical_variogram(reduced_distance, variance_contribution):
-    '''
-    Compute the value of a variogram with a spherical model
-    
-    @param reduced_distance: The distance between the two points divided by the
-                             variogram range
-    @param variance_contribution: The variance for this variogram model
-    
-    @return The value of the variogram
-    '''
-    if reduced_distance <= 1:
-        return variance_contribution*(1.5*reduced_distance - 0.5*reduced_distance**3)
-    return variance_contribution
-@jit(nopython = True)
-def exponential_variogram(reduced_distance, variance_contribution):
-    '''
-    Compute the value of a variogram with an exponential model
-    
-    @param reduced_distance: The distance between the two points divided by the
-                             variogram range
-    @param variance_contribution: The variance for this variogram model
-    
-    @return The value of the variogram
-    '''
-    return variance_contribution*(1. - math.exp(-3*reduced_distance))
-
-class VariogramModel(Enum):
-    NUGGET = 0
-    GAUSSIAN = 1
-    SPHERICAL = 2
-    EXPONENTIAL = 3
-@jit(nopython = True)
-def compute_variogram(delta_y,
-                      delta_x,
-                      vario_models,
-                      vario_sills,
-                      vario_ranges,
-                      rotation_matrix):
-    '''
-    Compute the value of a (possibly nested) 2D variogram
-    
-    @param delta_y: The distance between the two points along the y axis
-    @param delta_x: The distance between the two points along the x axis
-    @param vario_models: The models for the variogram
-    @param vario_sills: The sills for the variogram
-    @param vario_ranges: The major and minor ranges for the variogram
-    @param rotation_matrix: The 2D rotation matrix
-    
-    @return The value of the variogram
-    '''
-    variogram_value = 0.
-    nugget = 0.
-    for vario_model, vario_sill, vario_range in zip(vario_models,
-                                                    vario_sills,
-                                                    vario_ranges):
-        u = delta_x
-        v = delta_y
-        if vario_range[0] != 0. and vario_range[1] != 0.:
-            u = (delta_y*rotation_matrix[0, 0] + delta_x*rotation_matrix[0, 1])/vario_range[0]
-            v = (delta_y*rotation_matrix[1, 0] + delta_x*rotation_matrix[1, 1])/vario_range[1]
-        reduced_distance = math.sqrt(u**2 + v**2)
-        if vario_model == VariogramModel.GAUSSIAN:
-            variogram_value += gaussian_variogram(reduced_distance, vario_sill - nugget)
-        elif vario_model == VariogramModel.SPHERICAL:
-            variogram_value += spherical_variogram(reduced_distance, vario_sill - nugget)
-        elif vario_model == VariogramModel.EXPONENTIAL:
-            variogram_value += exponential_variogram(reduced_distance, vario_sill - nugget)
-        else:
-            variogram_value += nugget_variogram(reduced_distance, vario_sill)
-        nugget = vario_sill
-
-    return variogram_value
-
-@jit(nopython = True)
+@jit(nopython = True, nogil = True)
 def get_values_matrix(neighborhood, simulation_array):
     '''
     Get the matrix of already simulated values around the cell to estimate
@@ -333,7 +224,7 @@ def get_values_matrix(neighborhood, simulation_array):
         matrix[i, 0] = simulation_array[neighborhood[i]]
     return matrix
 
-@jit(nopython = True)
+@jit(nopython = True, nogil = True)
 def get_data_to_data_matrix(kriging_method,
                             cell_index,
                             neighborhood,
@@ -391,7 +282,7 @@ def get_data_to_data_matrix(kriging_method,
     
     return matrix
 
-@jit(nopython = True)
+@jit(nopython = True, nogil = True)
 def get_data_to_unknown_matrix(kriging_method,
                                cell_index,
                                neighborhood,
@@ -431,7 +322,7 @@ def get_data_to_unknown_matrix(kriging_method,
         
     return matrix
 
-@jit(nopython = True)
+@jit(nopython = True, nogil = True)
 def solve_kriging_system(cell_index,
                          neighborhood,
                          simulation_array,
@@ -499,9 +390,6 @@ def solve_kriging_system(cell_index,
 class KrigingMethod(Enum):
     SIMPLE = 0
     ORDINARY = 1
-class PathType(Enum):
-    LINEAR = 0
-    RANDOM = 1
 @jit(nopython = True)
 def run_sgs(data_array,
             grid_yx_spacing,
@@ -519,7 +407,7 @@ def run_sgs(data_array,
             seed = 100,
             no_data_value = -99999.):
     '''
-    Perform a Sequential Gaussian Simulation (SGS). Secondary data are taken
+    Perform a 2D Sequential Gaussian Simulation (SGS). Secondary data are taken
     into account using an intrinsic collocated cokriging
     (see Babak and Deutsch, 2009, doi:10.1016/j.cageo.2008.02.025)
     
@@ -621,6 +509,198 @@ def run_sgs(data_array,
     
     return simulation_array
 
+@jit(nopython = True, nogil=True)
+def simulate_sgs_realization(data_array,
+                             path_type,
+                             primary_mean,
+                             primary_variance,
+                             neighborhood_template,
+                             correlation_template,
+                             max_number_data,
+                             secondary_data_weight,
+                             secondary_data_array,
+                             seed,
+                             no_data_value):
+    '''
+    Perform a single 2D Sequential Gaussian Simulation (SGS). Secondary data are
+    taken into account using an intrinsic collocated cokriging
+    (see Babak and Deutsch, 2009, doi:10.1016/j.cageo.2008.02.025)
+    
+    @param data_array: The primary data (no_data_value for the areas to simulate,
+                       math.nan for the areas outside of the simulation domain)
+    @param path_type: The type of path, which determines the order through which
+                      the cells are visited (see PathType)
+    @param primary_mean: Mean for the variable to estimate (if using a simple
+                         kriging, math.nan if using an ordinary kriging)
+    @param primary_variance: Variance for the variable to estimate
+    @param neighborhood_template: The neighborhood to a center cell, from the
+                                  closest to the farthest
+    @param correlation_template: The variogram values in the neighborhood
+    @param max_number_data: The maximum number of data in the neighborhood
+    @param secondary_data_weight: The weight for the secondary data (math.nan if
+                                  no secondary data)
+    @param secondary_data_array: The secondary data
+    @param seed: The seed
+    @param no_data_value: The no-data value, which defines the cell to simulate
+    
+    @return The simulated array
+    '''
+    random.seed(seed)
+    
+    simulation_array = np.copy(data_array)
+
+    simulation_path = np.arange(0, simulation_array.size, 1)
+    if path_type == PathType.RANDOM:
+        random.shuffle(simulation_path)
+
+    for flattened_index in simulation_path:
+        cell_index = unflatten_index(flattened_index, simulation_array.shape)
+
+        if simulation_array[cell_index[0], cell_index[1]] == no_data_value:
+            neighborhood = get_neighborhood(cell_index,
+                                            simulation_array,
+                                            neighborhood_template,
+                                            max_number_data,
+                                            no_data_value)
+            if len(neighborhood) < 2:
+                if math.isnan(secondary_data_weight) == True:
+                    simulation_array[cell_index[0], cell_index[1]] = random.gauss(0., 1.)
+                else:
+                    mean = secondary_data_weight*secondary_data_array[cell_index]
+                    variance = 1. - secondary_data_weight**2
+                    simulation_array[cell_index[0], cell_index[1]] = random.gauss(mean, variance)
+            else:
+                estimated_mean, estimated_variance = solve_kriging_system(cell_index,
+                                                                          neighborhood,
+                                                                          simulation_array,
+                                                                          primary_mean,
+                                                                          primary_variance,
+                                                                          correlation_template,
+                                                                          secondary_data_weight,
+                                                                          0.,
+                                                                          secondary_data_array)
+                simulation_array[cell_index[0], cell_index[1]] = random.gauss(estimated_mean,
+                                                                              math.sqrt(estimated_variance))
+    
+    return simulation_array
+
+@jit(nopython = True, parallel = True, nogil = True)
+def run_parallel_sgs(data_array,
+                     grid_yx_spacing,
+                     vario_models,
+                     vario_sills,
+                     vario_azimuth,
+                     vario_ranges,
+                     number_realizations = 1,
+                     path_type = PathType.RANDOM,
+                     kriging_method = KrigingMethod.SIMPLE,
+                     neighborhood_range = (math.nan, math.nan),
+                     max_number_data = 12,
+                     secondary_data_weight = math.nan,
+                     secondary_data_array = np.empty((1, 1)),
+                     seed = 100,
+                     nb_threads = 4,
+                     no_data_value = -99999.):
+    '''
+    Perform a 2D Sequential Gaussian Simulation (SGS) with the realizations
+    simulated in parallel. Secondary data are taken into account using an
+    intrinsic collocated cokriging (see Babak and Deutsch, 2009,
+    doi:10.1016/j.cageo.2008.02.025)
+    
+    @param data_array: The primary data (no_data_value for the areas to simulate,
+                       math.nan for the areas outside of the simulation domain)
+    @param grid_yx_spacing: The cell size along each axis (y, x)
+    @param vario_models: The models for the variogram
+    @param vario_sills: The sills for the variogram
+    @param vario_azimuth: The azimuth of the variogram's major axis (in degree)
+    @param vario_ranges: The major and minor ranges for the variogram
+    @param number_realizations: The number of realizations to simulate
+    @param path_type: The type of path, which determines the order through which
+                      the cells are visited (see PathType)
+    @param kriging_method: The kriging method (see KrigingMethod)
+    @param neighborhood_range: The range of the neighborhood, beyond which the
+                               cells with already a value are not taken into
+                               account (in grid spacing unit)
+    @param max_number_data: The maximum number of data in the neighborhood
+    @param secondary_data_weight: The weight for the secondary data (math.nan if
+                                  no secondary data)
+    @param secondary_data_array: The secondary data
+    @param seed: The seed
+    @param no_data_value: The no-data value, which defines the cell to simulate
+    
+    @return The simulated array
+    '''
+    assert (len(data_array.shape) == 2
+            and len(grid_yx_spacing) == 2
+            and len(neighborhood_range) == 2
+            and len(secondary_data_array.shape) == 2), "The arrays must be two-dimensional"
+    assert (len(vario_models) == len(vario_sills)
+            and len(vario_models) == len(vario_ranges)), "Some parameters for the (nested) variogram are missing"
+    for i in range(len(vario_ranges)):
+        assert len(vario_ranges[i]) == 2, "A major or minor range is missing from the variogram ranges"
+    if math.isnan(secondary_data_weight) == False:
+        assert -1 <= secondary_data_weight <= 1, "The secondary data weight must be between -1 and 1"
+    assert math.isnan(no_data_value) == False, "The no data value cannot be NaN"
+    
+    primary_mean = 0.
+    if kriging_method == KrigingMethod.ORDINARY:
+        primary_mean = math.nan
+    primary_variance = vario_sills[-1]
+    
+    if math.isnan(neighborhood_range[0]) and math.isnan(neighborhood_range[1]):
+        neighborhood_range = (vario_ranges[-1][0], vario_ranges[-1][1])
+    
+    vario_azimuth_rad = vario_azimuth*math.pi/180.
+    rotation_matrix = np.empty((2, 2))
+    rotation_matrix[0, 0] = math.cos(vario_azimuth_rad)
+    rotation_matrix[0, 1] = math.sin(vario_azimuth_rad)
+    rotation_matrix[1, 0] = math.sin(vario_azimuth_rad)
+    rotation_matrix[1, 1] = -math.cos(vario_azimuth_rad)
+    
+    neighborhood_template, correlation_template = compute_neighborhood_template(neighborhood_range,
+                                                                                grid_yx_spacing,
+                                                                                vario_models,
+                                                                                vario_sills,
+                                                                                vario_ranges,
+                                                                                vario_azimuth_rad,
+                                                                                rotation_matrix)
+    
+    simulation_array = np.empty((number_realizations, data_array.shape[0], data_array.shape[1]))
+    for i_rez in prange(number_realizations):
+        simulation_array[i_rez] = simulate_sgs_realization(data_array,
+                                                           path_type,
+                                                           primary_mean,
+                                                           primary_variance,
+                                                           neighborhood_template,
+                                                           correlation_template,
+                                                           max_number_data,
+                                                           secondary_data_weight,
+                                                           secondary_data_array,
+                                                           seed + i_rez,
+                                                           no_data_value)
+    # with concurrent.futures.ThreadPoolExecutor(max_workers = nb_threads) as executor:
+    #     future_to_sim = {executor.submit(simulate_sgs_realization,
+    #                                      data_array,
+    #                                      path_type,
+    #                                      primary_mean,
+    #                                      primary_variance,
+    #                                      neighborhood_template,
+    #                                      correlation_template,
+    #                                      max_number_data,
+    #                                      secondary_data_weight,
+    #                                      secondary_data_array,
+    #                                      seed + i_rez,
+    #                                      no_data_value): i_rez for i_rez in range(number_realizations)}
+    #     i_rez = 0
+    #     for rez in concurrent.futures.as_completed(future_to_sim):
+    #         try:
+    #             simulation_array[i_rez] = rez.result()
+    #         except Exception as exc:
+    #             print('The simulation %d failed' % i_rez)
+    #         i_rez += 1
+    
+    return simulation_array
+
 ################################################################################
 # Data transform
 ################################################################################
@@ -696,122 +776,3 @@ def normal_score_tranform(value_array):
     '''
     cumulative_value_array = compute_averaged_cumulative_distribution_from_array(value_array)
     return inverse_standard_normal_cdf(cumulative_value_array)
-
-################################################################################
-# Utilities
-################################################################################
-
-def standardize(x):
-    '''
-    Reduce and center a float or array
-    
-    @param x: The float or array
-    
-    @return A float or array
-    '''
-    return (x - np.nanmean(x))/np.nanstd(x)
-
-@jit(nopython = True)
-def map_2D_variogram(vario_models,
-                     vario_sills,
-                     vario_azimuth,
-                     vario_ranges,
-                     neighborhood_range,
-                     map_shape,
-                     grid_spacing):
-    '''
-    Map the variogram values in a 2D neighborhood
-    
-    @param vario_models: The models for the variogram
-    @param vario_sills: The sills for the variogram
-    @param vario_azimuth: The azimuth of the variogram's major axis (in degree)
-    @param vario_ranges: The major and minor ranges for the variogram
-    @param neighborhood_range: The range of the neighborhood, beyond which the
-                               cells with already a value are not taken into
-                               account (in grid spacing unit)
-    @param map_shape: The number of cells along each axis (y, x) for the variogram map
-    @param grid_spacing: The cell size along each axis (y, x)
-    
-    @return The variogram map as a 2D array
-    '''
-    assert (len(map_shape) == 2
-            and len(grid_yx_spacing) == 2
-            and len(neighborhood_range) == 2), "The arrays must be two-dimensional"
-    assert (len(vario_models) == len(vario_sills)
-            and len(vario_models) == len(vario_ranges)), "Some parameters for the (nested) variogram are missing"
-    for vario_range in vario_ranges:
-        assert len(vario_range) == 2, "A major or minor range is missing from the variogram ranges"
-    
-    vario_azimuth_rad = vario_azimuth*math.pi/180.
-    rotation_matrix = np.empty((2, 2))
-    rotation_matrix[0, 0] = math.cos(vario_azimuth_rad)
-    rotation_matrix[0, 1] = math.sin(vario_azimuth_rad)
-    rotation_matrix[1, 0] = math.sin(vario_azimuth_rad)
-    rotation_matrix[1, 1] = -math.cos(vario_azimuth_rad)
-
-    variogram_map = np.full(map_shape, np.nan)
-
-    for j in range(map_shape[0]):
-        delta_y = (int(map_shape[0]/2.) - j)*grid_spacing[0]
-        for i in range(map_shape[1]):
-            delta_x = (i - int(map_shape[1]/2.))*grid_spacing[1]
-            ellipse_radius = ((delta_y*rotation_matrix[0, 0]
-                               + delta_x*rotation_matrix[0, 1])**2)/(neighborhood_range[0]**2)\
-                             + ((delta_y*rotation_matrix[1, 0]
-                                 + delta_x*rotation_matrix[1, 1])**2)/(neighborhood_range[1]**2)
-            if ellipse_radius <= 1:
-                variogram = compute_variogram(delta_y,
-                                              delta_x,
-                                              vario_models,
-                                              vario_sills,
-                                              vario_ranges,
-                                              rotation_matrix)
-                variogram_map[j, i] = variogram
-                
-    return variogram_map
-
-@jit(nopython = True)
-def compute_range_variogram(deltas_y,
-                            deltas_x,
-                            vario_models,
-                            vario_sills,
-                            vario_ranges,
-                            vario_azimuth = 0.):
-    '''
-    Compute the variogram values for a range of distances
-    
-    @param deltas_y: A 1D array of distances between the two points along the y axis
-    @param deltas_x: A 1D array of distances between the two points along the x axis
-    @param vario_models: The models for the variogram
-    @param vario_sills: The sills for the variogram
-    @param vario_azimuth: The azimuth of the variogram's major axis (in degree)
-    @param vario_ranges: The major and minor ranges for the variogram
-    
-    @return The variogram values as a 1D array
-    '''
-    assert (len(deltas_y.shape) == 1
-            and len(deltas_x.shape) == 1), "The delta arrays must be one-dimensional"
-    assert (deltas_y.shape == deltas_x.shape), "The delta arrays must have the same size"
-    assert (len(vario_models) == len(vario_sills)
-            and len(vario_models) == len(vario_ranges)), "Some parameters for the (nested) variogram are missing"
-    for vario_range in vario_ranges:
-        assert len(vario_range) == 2, "A major or minor range is missing from the variogram ranges"
-    
-    vario_azimuth_rad = vario_azimuth*math.pi/180.
-    rotation_matrix = np.empty((2, 2))
-    rotation_matrix[0, 0] = math.cos(vario_azimuth_rad)
-    rotation_matrix[0, 1] = math.sin(vario_azimuth_rad)
-    rotation_matrix[1, 0] = math.sin(vario_azimuth_rad)
-    rotation_matrix[1, 1] = -math.cos(vario_azimuth_rad)
-    
-    variogram = np.zeros(len(deltas_y))
-    for i in range(len(deltas_y)):
-        value = compute_variogram(deltas_y[i],
-                                  deltas_x[i],
-                                  vario_models,
-                                  vario_sills,
-                                  vario_ranges,
-                                  rotation_matrix)
-        variogram[i] = value
-        
-    return variogram

@@ -1,1 +1,1 @@
-__all__ = ["sequential_gaussian_simulation"]
+__all__ = ["direct_sampling", "geostatistics_utils", "sequential_gaussian_simulation", "variogram"]
