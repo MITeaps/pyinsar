@@ -716,9 +716,9 @@ def inverse_standard_normal_cdf(x):
     return math.sqrt(2.)*erfinv(2.*x - 1.)
 
 @jit(nopython = True)
-def compute_averaged_cumulative_distribution(value_array,
-                                             unique_sorted_array,
-                                             counts_sorted_array):
+def _compute_averaged_cumulative_distribution_from_array(value_array,
+                                                         unique_sorted_array,
+                                                         counts_sorted_array):
     '''
     Compute the cumulative probability distribution, where the cumulative
     probability for a data value is the average between its cumulative
@@ -762,9 +762,9 @@ def compute_averaged_cumulative_distribution_from_array(value_array):
     unique_sorted_array, counts_sorted_array = np.unique(sorted_array,
                                                          return_counts = True)
     
-    return compute_averaged_cumulative_distribution(value_array,
-                                                    unique_sorted_array,
-                                                    counts_sorted_array)
+    return _compute_averaged_cumulative_distribution_from_array(value_array,
+                                                                unique_sorted_array,
+                                                                counts_sorted_array)
 
 def normal_score_tranform(value_array):
     '''

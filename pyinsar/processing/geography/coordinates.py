@@ -25,6 +25,7 @@
 import numpy as np
 
 from osgeo import gdal, osr
+from numba import jit
 
 ################################################################################
 # Array coordinates
@@ -157,6 +158,35 @@ def extract_subgeoarray(georaster_array,
     new_georaster_extent = (new_x_min, new_x_max, new_y_min, new_y_max)
     
     return new_georaster_array, new_georaster_extent
+
+@jit(nopython = True)
+def sample_array(array, subarray_shape, steps = (1, 1)):
+    '''
+    Extract all the possible sub-arrays of a given shape that do not contain any
+    NaN
+    
+    @param array: A 2D NumPy array
+    @param subarray_shape: The shape of the sub-arrays
+    @param steps: The step between each sub-array for each axis, to avoid 
+                  sampling all the possible sub-arrays
+    
+    @return The sub-arrays as a 3D NumPy array
+    '''
+    assert (len(array.shape) == 2 and len(subarray_shape) == 2), 'Array must be 2D'
+
+    subarrays = np.empty((0,
+                          subarray_shape[0],
+                          subarray_shape[1]))
+    for j in range(0, array.shape[0], steps[0]):
+        for i in range(0, array.shape[1], steps[1]):
+            if (j + subarray_shape[0] < array.shape[0]
+                and i + subarray_shape[1] < array.shape[1]):
+                subarray = array[j:j + subarray_shape[0], i:i + subarray_shape[1]]
+                if np.isnan(subarray).any() == False:
+                    expanded_subarray = np.expand_dims(subarray, axis = 0)
+                    subarrays = np.concatenate((subarrays, expanded_subarray))
+        
+    return subarrays
 
 ################################################################################
 # Projection

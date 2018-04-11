@@ -52,18 +52,22 @@ def average_minmax_slices(array, axis = 0):
 
 def plot_interactive_slicing(array,
                              slice_index,
+                             model_array = None,
                              axis = 0,
                              cmap = 'viridis',
                              extent = None,
                              clabel = '',
                              xlabel = '',
-                             ylabel = ''):
+                             ylabel = '',
+                             figsize = None,
+                             update_colorbar = False):
     '''
     Plot 2D slices of a 3D NumPy array, with the possibility to loop through and
     visualize the slices
     
     @param array: A 3D NumPy array
     @param slice_index: The initial slice to show
+    @param model_array: A 2D NumPy array to compare to the realizations
     @param axis: The axis perpendicular to the slices
     @param cmap: A colormap for the array
     @param extent: The spatial extent of the slice
@@ -71,25 +75,57 @@ def plot_interactive_slicing(array,
     @param xlabel: A label for the x axis
     @param ylabel: A label for the y axis
     '''
-    
-    mean_min, mean_max = average_minmax_slices(array, axis = axis)
-    
     s = [slice(slice_index, slice_index + 1) if i == axis else slice(None) for i in range(3)]
     sliced_array = array[s].squeeze()
     
-    figure = plt.figure()
-    subfigure = figure.add_subplot(111)
+    min_value = 0.
+    max_value = 1.
+    if update_colorbar == False:
+        if model_array is None:
+            min_value, max_value = average_minmax_slices(array, axis = axis)
+        else:
+            min_value = np.nanmin(model_array)
+            max_value = np.nanmax(model_array)
+    else:
+        min_value = np.nanmin(sliced_array)
+        max_value = np.nanmax(sliced_array)
+    
+    number_plots = 1
+    if model_array is not None:
+        number_plots = 2
+    
+    figure, subplots = plt.subplots(1,
+                                    number_plots,
+                                    sharex = True, 
+                                    sharey = True, 
+                                    figsize = figsize)
+     
+    subplot = subplots
+    if model_array is not None:
+        subplot = subplots[1]
+        
+        model_raster_map = subplots[0].imshow(np.ma.masked_invalid(model_array), 
+                                              extent = extent,
+                                              cmap = cmap, interpolation = 'None',
+                                              rasterized = True,
+                                              vmin = min_value,
+                                              vmax = max_value,
+                                              zorder = 0)
+        subplots[0].set_xlabel(xlabel)
+        subplots[0].set_ylabel(ylabel)
 
-    raster_map = plt.imshow(np.ma.masked_invalid(sliced_array), extent = extent,
-                            cmap = cmap, interpolation = 'None', rasterized = True,
-                            vmin = mean_min, vmax = mean_max,
-                            zorder = 0)
-
-    raster_map_colorbar = plt.colorbar(raster_map)
+    raster_map = subplot.imshow(np.ma.masked_invalid(sliced_array),
+                                extent = extent,
+                                cmap = cmap, interpolation = 'None',
+                                rasterized = True,
+                                vmin = min_value,
+                                vmax = max_value,
+                                zorder = 0)
+    raster_map_colorbar = plt.colorbar(raster_map, ax = subplots)
     raster_map_colorbar.set_label(clabel)
-
-    subfigure.set_xlabel(xlabel)
-    subfigure.set_ylabel(ylabel)
+    if model_array is None:
+        subplot.set_xlabel(xlabel)
+    subplot.set_ylabel(ylabel)
 
     plt.show()
     
@@ -97,6 +133,12 @@ def plot_interactive_slicing(array,
         s = [slice(new_slice_index, new_slice_index + 1) if i == axis else slice(None) for i in range(3)]
         sliced_array = array[s].squeeze()
         raster_map.set_data(sliced_array)
+        if update_colorbar == True:
+            raster_map.set_clim(vmin = np.nanmin(sliced_array),
+                                vmax = np.nanmax(sliced_array))
+            if model_array is not None:
+                model_raster_map.set_clim(vmin = np.nanmin(sliced_array),
+                                          vmax = np.nanmax(sliced_array))
     
     interactive_plot = interact(update_imshow,
                                 new_slice_index = BoundedIntText(value = slice_index,

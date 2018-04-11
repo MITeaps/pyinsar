@@ -58,10 +58,10 @@ def create_georaster_from_array(georaster_array,
 
     driver = gdal.GetDriverByName(file_type)
     new_georaster = driver.Create(file_path,
-                               georaster_x_size,
-                               georaster_y_size,
-                               number_of_bands,
-                               data_type)
+                                  georaster_x_size,
+                                  georaster_y_size,
+                                  number_of_bands,
+                                  data_type)
     new_georaster.SetGeoTransform(geotransform)
     new_georaster.SetProjection(projection)
     

@@ -808,7 +808,7 @@ def run_parallel_ds(data_array,
                     ti_fraction,
                     max_number_data,
                     max_density_data,
-                    neighborhood_shape = np.full(2, math.inf),
+                    neighborhood_shape = (math.inf, math.inf),
                     grid_yx_spacing = (1., 1.),
                     delta = 0.,
                     max_non_matching_proportion = 1,
@@ -903,9 +903,10 @@ def run_parallel_ds(data_array,
 
     minmax_ti_values = get_minmax_array(training_image_array, variable_types)
 
-    neighborhood_shape[0] = min(data_array.shape[1], neighborhood_shape[0])
-    neighborhood_shape[1] = min(data_array.shape[2], neighborhood_shape[1])
-    lag_vectors, lag_distances = compute_neighborhood_lag_vectors(neighborhood_shape,
+    updated_neighborhood_shape = np.empty(2)
+    updated_neighborhood_shape[0] = min(data_array.shape[1], neighborhood_shape[0])
+    updated_neighborhood_shape[1] = min(data_array.shape[2], neighborhood_shape[1])
+    lag_vectors, lag_distances = compute_neighborhood_lag_vectors(updated_neighborhood_shape,
                                                                   grid_yx_spacing,
                                                                   delta)
     
@@ -923,7 +924,7 @@ def run_parallel_ds(data_array,
                                                           max_density_data,
                                                           lag_vectors,
                                                           lag_distances,
-                                                          neighborhood_shape,
+                                                          updated_neighborhood_shape,
                                                           max_non_matching_proportion,
                                                           start_parameter_reduction,
                                                           reduction_factor,
