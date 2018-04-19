@@ -31,22 +31,6 @@ from numba import prange
 from pyinsar.processing.machine_learning.geostatistics.geostatistics_utils import PathType, VariableType, unflatten_index
 
 @jit(nopython = True)
-def is_any_inferior(list_1, list_2):
-    '''
-    Check if any value of a list is strictly inferior to those of another list 
-    (or tuple, or 1D NumPy array)
-    
-    @param list_1: The first list
-    @param list_2: The other list
-    
-    @return True if a value is strictly inferior, false otherwise
-    '''
-    for i in range(min(len(list_1), len(list_2))):
-        if list_1[i] < list_2[i]:
-            return True
-    return False
-
-@jit(nopython = True)
 def compute_neighborhood_lag_vectors(neighborhood_shape,
                                      grid_yx_spacing,
                                      delta):
@@ -70,7 +54,7 @@ def compute_neighborhood_lag_vectors(neighborhood_shape,
     for j in range(-2*neighborhood_shape[0], 2*neighborhood_shape[0] + 1):
         delta_y = j*grid_yx_spacing[0]
         for i in range(-2*neighborhood_shape[1], 2*neighborhood_shape[1] + 1):
-            if i != 0 or j != 0:
+            if j != 0 or i != 0:
                 delta_x = i*grid_yx_spacing[1]
                 distance = math.sqrt(delta_y**2 + delta_x**2)
                 lag_vectors.append((distance, j, i))
@@ -88,6 +72,7 @@ def compute_neighborhood_lag_vectors(neighborhood_shape,
 
 @jit(nopython = True)
 def compute_neighborhoods(simulation_array,
+                          data_weight_array,
                           cell_j,
                           cell_i,
                           lag_vectors,
@@ -107,6 +92,9 @@ def compute_neighborhoods(simulation_array,
     @param simulation_array: A NumPy array representing the simulation grid.
                              It should be a 3D array, with one dimension for
                              the variable(s), and two spatial dimensions
+    @param data_weight_array: A NumPy array representing the conditioning weight.
+                              It should be a 3D array, with one dimension for
+                              the variable(s), and two spatial dimensions
     @param cell_j: Index along the y axis of the central cell in the simulation grid
     @param cell_i: Index along the x axis of the central cell in the simulation grid
     @param lag_vectors: Index of the closest cells relative to the central cell
@@ -122,8 +110,9 @@ def compute_neighborhoods(simulation_array,
     @param scaling_factor: The scaling to apply to each neighborhood for each axis
     @param no_data_value: The no-data value, which defines the cell to simulate
     
-    @return The indexes of the neighborhood's cells, the corresponding values and
-            weighted distances, and the neighbor size for each variable
+    @return The indexes of the neighborhood's cells; the corresponding values,
+            the weighted distances, and the conditioning weights; and the neighbor
+            size for each variable
     ''' 
     pre_neighbor_indexes = np.full((simulation_array.shape[0],
                                     np.max(max_number_data),
@@ -138,30 +127,30 @@ def compute_neighborhoods(simulation_array,
     i_neighbor = 0
     number_cells = 0
     neighborhood_size = neighborhood_shape[0]*neighborhood_shape[1]
-    while (is_any_inferior(loop_indexes, max_number_data)
-           and number_cells < neighborhood_size
-           and i_neighbor < lag_vectors.shape[0]):
-        j = lag_vectors[i_neighbor, 0]
-        i = lag_vectors[i_neighbor, 1]
-        if (0 <= cell_j + j < simulation_array.shape[1]
-            and 0 <= cell_i + i < simulation_array.shape[2]):
-            for k in range(loop_indexes.size):
-                if (loop_indexes[k] < max_number_data[k]
-                    and math.isnan(simulation_array[k, cell_j + j, cell_i + i]) == False
-                    and simulation_array[k, cell_j + j, cell_i + i] != no_data_value):
+    for k in range(loop_indexes.size):
+        while (loop_indexes[k] < max_number_data[k]
+               and i_neighbor < lag_vectors.shape[0]
+               and number_cells < neighborhood_size):
+            j = lag_vectors[i_neighbor, 0]
+            i = lag_vectors[i_neighbor, 1]
+            if (0 <= cell_j + j < simulation_array.shape[1]
+                and 0 <= cell_i + i < simulation_array.shape[2]):
+                if (simulation_array[k, cell_j + j, cell_i + i] != no_data_value
+                    and math.isnan(simulation_array[k, cell_j + j, cell_i + i]) == False):
                     pre_neighbor_indexes[k, loop_indexes[k], 0] = j
                     pre_neighbor_indexes[k, loop_indexes[k], 1] = i
                     pre_neighbor_distances[k, loop_indexes[k]] = lag_distances[i_neighbor]
                     loop_indexes[k] += 1
-            number_cells += 1
-        i_neighbor += 1
+                number_cells += 1
+            i_neighbor += 1
         
+    # TODO: always get the hard data in the data event, even when a density smaller than 1 is used
     neighbor_indexes = np.full(pre_neighbor_indexes.shape,
                                no_data_value,
                                dtype = np.int64)
     neighbor_values = np.full((pre_neighbor_indexes.shape[0],
                                pre_neighbor_indexes.shape[1],
-                               2),
+                               3),
                               no_data_value,
                               dtype = np.float64)
     for k in range(pre_neighbor_indexes.shape[0]):
@@ -178,6 +167,9 @@ def compute_neighborhoods(simulation_array,
                                                         pre_neighbor_indexes[k, i*step, 0] + cell_j,
                                                         pre_neighbor_indexes[k, i*step, 1] + cell_i]
             neighbor_values[k, i, 1] = pre_neighbor_distances[k, i*step]
+            neighbor_values[k, i, 2] = data_weight_array[k,
+                                                         pre_neighbor_indexes[k, i*step, 0] + cell_j,
+                                                         pre_neighbor_indexes[k, i*step, 1] + cell_i]
 
     return neighbor_indexes, neighbor_values, loop_indexes
 
@@ -185,12 +177,11 @@ def compute_neighborhoods(simulation_array,
 def compute_continuous_distance(training_image_array,
                                 ti_j,
                                 ti_i,
-                                min_ti_value,
-                                max_ti_value,
+                                ti_ranges_max,
                                 neighbor_indexes,
                                 neighbor_values,
                                 neighbor_numbers,
-                                distance_thresholds,
+                                min_distances,
                                 var_k,
                                 max_non_matching_proportion,
                                 no_data_value):
@@ -205,12 +196,12 @@ def compute_continuous_distance(training_image_array,
                  training image
     @param ti_i: Index along the x axis of the initial cell to visit in the
                  training image
-    @param min_ti_value: Minimal value of the variable
-    @param max_ti_value: Maximal value of the variable
+    @param ti_ranges_max: Squared difference between the min and max value of 
+                          each variable
     @param neighbor_indexes: Indexes of the neighborhood from the cell to simulate
     @param neighbor_values: Values of the neighborhood in the simulation grid
     @param neighbor_numbers: Number of neighbors for each variable
-    @param distance_thresholds: The distance thresholds for each variable
+    @param min_distances: The minimal distance of each variable found so far
     @param var_k: Index of the variable
     @param max_non_matching_proportion: Authorized proportion of non-matching
                                         nodes, i.e., whose distance is below the
@@ -226,11 +217,10 @@ def compute_continuous_distance(training_image_array,
     sum_pattern_distance = 0.
     non_matching_proportion = 0.
     i = 0
-    while (i < len(neighbor_indexes[var_k])
-           and neighbor_indexes[var_k, i, 0] != no_data_value
-           and non_matching_proportion < max_non_matching_proportion
+    while (i < neighbor_numbers[var_k]
            and 0 <= neighbor_indexes[var_k, i, 0] + ti_j < training_image_array.shape[1]
            and 0 <= neighbor_indexes[var_k, i, 1] + ti_i < training_image_array.shape[2]
+           and non_matching_proportion < max_non_matching_proportion
            and math.isnan(training_image_array[var_k,
                                                neighbor_indexes[var_k, i, 0] + ti_j,
                                                neighbor_indexes[var_k, i, 1] + ti_i]) == False
@@ -238,19 +228,19 @@ def compute_continuous_distance(training_image_array,
                                     neighbor_indexes[var_k, i, 0] + ti_j,
                                     neighbor_indexes[var_k, i, 1] + ti_i] != no_data_value):
         
-        distance += neighbor_values[var_k, i, 1]*(neighbor_values[var_k, i, 0]
-                                                  - training_image_array[var_k,
-                                                                         neighbor_indexes[var_k, i, 0] + ti_j,
-                                                                         neighbor_indexes[var_k, i, 1] + ti_i])**2
+        distance += neighbor_values[var_k, i, 2]*neighbor_values[var_k, i, 1]*(neighbor_values[var_k, i, 0]
+                                                                               - training_image_array[var_k,
+                                                                                                      neighbor_indexes[var_k, i, 0] + ti_j,
+                                                                                                      neighbor_indexes[var_k, i, 1] + ti_i])**2
         sum_pattern_distance += neighbor_values[var_k, i, 1]
-        if distance > distance_thresholds[var_k]:
+        if math.sqrt(distance/(sum_pattern_distance*ti_ranges_max[var_k])) > min_distances[var_k]:
             non_matching_proportion += 1./neighbor_numbers[var_k]
 
         i += 1
     if i < neighbor_numbers[var_k]:
         return math.inf
     
-    return math.sqrt(distance/(sum_pattern_distance*(max_ti_value - min_ti_value)**2))
+    return math.sqrt(distance/(sum_pattern_distance*ti_ranges_max[var_k]))
 
 @jit(nopython = True)
 def compute_discrete_distance(training_image_array,
@@ -259,7 +249,7 @@ def compute_discrete_distance(training_image_array,
                               neighbor_indexes,
                               neighbor_values,
                               neighbor_numbers,
-                              distance_thresholds,
+                              min_distances,
                               var_k,
                               max_non_matching_proportion,
                               no_data_value):
@@ -277,7 +267,7 @@ def compute_discrete_distance(training_image_array,
     @param neighbor_indexes: Indexes of the neighborhood from the cell to simulate
     @param neighbor_values: Values of the neighborhood in the simulation grid
     @param neighbor_numbers: Number of neighbors for each variable
-    @param distance_thresholds: The distance thresholds for each variable
+    @param min_distances: The minimal distance of each variable found so far
     @param var_k: Index of the variable
     @param max_non_matching_proportion: Authorized proportion of non-matching
                                         nodes, i.e., whose distance is below the
@@ -293,11 +283,10 @@ def compute_discrete_distance(training_image_array,
     sum_pattern_distance = 0.
     non_matching_proportion = 0.
     i = 0
-    while (i < len(neighbor_indexes[var_k])
-           and neighbor_indexes[var_k, i, 0] != no_data_value     
-           and non_matching_proportion/neighbor_numbers[var_k] < max_non_matching_proportion
+    while (i < neighbor_numbers[var_k] 
            and 0 <= neighbor_indexes[var_k, i, 0] + ti_j < training_image_array.shape[1]
            and 0 <= neighbor_indexes[var_k, i, 1] + ti_i < training_image_array.shape[2]
+           and non_matching_proportion/neighbor_numbers[var_k] < max_non_matching_proportion
            and math.isnan(training_image_array[var_k,
                                                neighbor_indexes[var_k, i, 0] + ti_j,
                                                neighbor_indexes[var_k, i, 1] + ti_i]) == False
@@ -308,9 +297,9 @@ def compute_discrete_distance(training_image_array,
         if (neighbor_values[var_k, i, 0] != training_image_array[var_k,
                                                                  neighbor_indexes[var_k, i, 0] + ti_j,
                                                                  neighbor_indexes[var_k, i, 1] + ti_i]):
-            distance += neighbor_values[var_k, i, 1]
+            distance += neighbor_values[var_k, i, 2]*neighbor_values[var_k, i, 1]
         sum_pattern_distance += neighbor_values[var_k, i, 1]
-        if distance > distance_thresholds[var_k]:
+        if distance/sum_pattern_distance > min_distances[var_k]:
             non_matching_proportion += 1.
         
         i += 1
@@ -318,13 +307,13 @@ def compute_discrete_distance(training_image_array,
     if i < neighbor_numbers[var_k]:
         return math.inf
             
-    return math.sqrt(distance/sum_pattern_distance)
+    return distance/sum_pattern_distance
 
 @jit(nopython = True)
 def get_value_from_training_image(training_image_array,
                                   ti_j,
                                   ti_i,
-                                  minmax_ti_values,
+                                  ti_ranges_max,
                                   neighbor_indexes,
                                   neighbor_values,
                                   neighbor_numbers,
@@ -345,7 +334,8 @@ def get_value_from_training_image(training_image_array,
                  training image
     @param ti_i: Index along the x axis of the initial cell to visit in the
                  training image
-    @param minmax_ti_values: Min and max value of each variable
+    @param ti_ranges_max: Squared difference between the min and max value of 
+                          each variable
     @param neighbor_indexes: Indexes of the neighborhood from the cell to simulate
     @param neighbor_values: Values of the neighborhood in the simulation grid
     @param neighbor_numbers: Number of neighbors for each variable
@@ -362,44 +352,52 @@ def get_value_from_training_image(training_image_array,
     new_ti_j = ti_j
     new_ti_i = ti_i
     number_cells = 0
+    number_valid_cells = 0
     min_error = math.inf
+    min_distances = np.full(distance_thresholds.shape, 2.)
+    distances = np.copy(min_distances)
     min_ti_j = ti_j
     min_ti_i = ti_i
     ti_size = training_image_array.shape[1]*training_image_array.shape[2]
-    while (number_cells/ti_size < ti_fraction and min_error > 0.):
+    while (min_error > 0.
+           and number_valid_cells/ti_size < ti_fraction
+           and number_cells < ti_size):
         if is_any_nan(training_image_array[:, new_ti_j, new_ti_i]) == False:
             error = 0.
             for k in range(training_image_array.shape[0]):
-                if math.isnan(minmax_ti_values[k, 0]) == False:
-                    distance = compute_continuous_distance(training_image_array,
+                if math.isnan(ti_ranges_max[k]) == False:
+                    distances[k] = compute_continuous_distance(training_image_array,
                                                            new_ti_j,
                                                            new_ti_i,
-                                                           minmax_ti_values[k, 0],
-                                                           minmax_ti_values[k, 1],
+                                                           ti_ranges_max,
                                                            neighbor_indexes,
                                                            neighbor_values,
                                                            neighbor_numbers,
-                                                           distance_thresholds,
+                                                           min_distances,
                                                            k,
                                                            max_non_matching_proportion,
                                                            no_data_value)
-                    error += max(0., (distance - distance_thresholds[k])/distance_thresholds[k])
+                    error += max(0., (distances[k] - distance_thresholds[k])/distance_thresholds[k])
                 else:
-                    distance = compute_discrete_distance(training_image_array,
+                    distances[k] = compute_discrete_distance(training_image_array,
                                                          new_ti_j,
                                                          new_ti_i,
                                                          neighbor_indexes,
                                                          neighbor_values,
                                                          neighbor_numbers,
-                                                         distance_thresholds,
+                                                         min_distances,
                                                          k,
                                                          max_non_matching_proportion,
                                                          no_data_value)
-                    error += max(0., (distance - distance_thresholds[k])/distance_thresholds[k])
+                    error += max(0., (distances[k] - distance_thresholds[k])/distance_thresholds[k])
             if error < min_error:
                 min_error = error
+                min_distances = np.copy(distances)
                 min_ti_j = new_ti_j
                 min_ti_i = new_ti_i
+                number_valid_cells += 1
+            elif math.isinf(error) == False:
+                number_valid_cells += 1
         
         new_ti_i += 1
         if new_ti_i == training_image_array.shape[2]:
@@ -410,50 +408,38 @@ def get_value_from_training_image(training_image_array,
                 
         number_cells += 1
         
-    value = training_image_array[:, min_ti_j, min_ti_i]
-    if min_error > 0. and max_non_matching_proportion < 1.:
-        value = get_value_from_training_image(training_image_array,
-                                              ti_j,
-                                              ti_i,
-                                              minmax_ti_values,
-                                              neighbor_indexes,
-                                              neighbor_values,
-                                              neighbor_numbers,
-                                              distance_thresholds,
-                                              1.,
-                                              ti_fraction,
-                                              no_data_value)
-        
-    return value
+    return training_image_array[:, min_ti_j, min_ti_i]
 
 @jit(nopython = True)
-def get_minmax_array(array, variable_types):
+def get_ranges_max_array(array, variable_types):
     '''
-    Get the min and max values of one or several variables in a 3D NumPy array,
-    the first dimension being the variables, the other two the spatial dimensions
+    Get the squared difference between the min and max values of one or several
+    variables in a 3D NumPy array, the first dimension being the variables, the
+    other two the spatial dimensions
     
     @param array: The array
     @param variable_types: The type of variables in the array (i.e., discrete or
                            continuous)
     
-    @return The min and max values of each variable. Discrete variables get NaN.
+    @return The squared difference between the min and max values of each variable.
+            Discrete variables get NaN.
     '''
-    minmax_values = np.empty((array.shape[0], 2))
+    ranges_max = np.empty(array.shape[0])
     for k in range(array.shape[0]):
         if variable_types[k] == VariableType.CONTINUOUS:
-            minmax_values[k, 0] = math.inf
-            minmax_values[k, 1] = -math.inf
+            min_value = math.inf
+            max_value = -math.inf
             for j in range(array.shape[1]):
                 for i in range(array.shape[2]):
-                    if array[k, j, i] < minmax_values[k, 0]:
-                        minmax_values[k, 0] = array[k, j, i]
-                    if array[k, j, i] > minmax_values[k, 1]:
-                        minmax_values[k, 1] = array[k, j, i]
+                    if array[k, j, i] < min_value:
+                        min_value = array[k, j, i]
+                    if array[k, j, i] > max_value:
+                        max_value = array[k, j, i]
+            ranges_max[k] = (max_value - min_value)**2
         elif variable_types[k] == VariableType.DISCRETE:
-            minmax_values[k, 0] = math.nan
-            minmax_values[k, 1] = math.nan
+            ranges_max[k] = math.nan
                     
-    return minmax_values
+    return ranges_max
 
 @jit(nopython = True)
 def is_any_equal(list_1, value):
@@ -495,7 +481,8 @@ def run_ds(data_array,
            neighborhood_shape = (math.inf, math.inf),
            grid_yx_spacing = (1., 1.),
            delta = 0.,
-           max_non_matching_proportion = 1,
+           conditioning_data_weight = 1.,
+           max_non_matching_proportion = 1.,
            start_parameter_reduction = 1,
            reduction_factor = 1,
            rotation_angle_array = np.empty((1, 1)),
@@ -536,6 +523,8 @@ def run_ds(data_array,
     @param delta: A weight for the neighboring cells during simulation, a high
                   delta giving more influence to the cells closer to the cell to
                   simulate
+    @param conditioning_data_weight: A weight to favor the reproduction of the
+                                     patterns around conditioning data
     @param max_non_matching_proportion: Authorized proportion of non-matching
                                         nodes, i.e., whose distance is below the
                                         threshold for the variable
@@ -577,20 +566,26 @@ def run_ds(data_array,
     if rotation_angle_array.shape != data_array.shape[-2:]:
         rotation_angle_array = np.full(data_array.shape[-2:], 0.)
     else:
-        rotation_angle_array *= np.pi/180.
+        rotation_angle_array = rotation_angle_array*np.pi/180.
     if scaling_factor_array.shape != (2, data_array.shape[-2], data_array.shape[-1]):
         scaling_factor_array = np.full((2, data_array.shape[-2], data_array.shape[-1]), 1.)
     assert math.isnan(no_data_value) == False, "The no data value cannot be NaN"
             
     random.seed(seed)
 
-    minmax_ti_values = get_minmax_array(training_image_array, variable_types)
+    ti_ranges_max = get_ranges_max_array(training_image_array, variable_types)
 
     neighborhood_shape = (min(data_array.shape[1], neighborhood_shape[0]),
                           min(data_array.shape[2], neighborhood_shape[1]))
     lag_vectors, lag_distances = compute_neighborhood_lag_vectors(neighborhood_shape,
                                                                   grid_yx_spacing,
                                                                   delta)
+    
+    data_weight_array = np.ones(data_array.shape)
+    for index in np.ndindex(data_weight_array.shape):
+        if (data_array[index] != no_data_value
+            and math.isnan(data_array[index]) == False):
+            data_weight_array[index] = conditioning_data_weight
     
     simulation_array = np.empty((number_realizations,
                                  data_array.shape[0],
@@ -630,8 +625,10 @@ def run_ds(data_array,
                 cell_j, cell_i = unflatten_index(simulation_path[i_cell], simulation_array[i_rez, 0].shape)
                 if (is_any_equal(simulation_array[i_rez, :, cell_j, cell_i], no_data_value) == True
                     or (is_postproc == True
+                        and is_any_equal(data_array[:, cell_j, cell_i], no_data_value) == True
                         and is_any_nan(simulation_array[i_rez, :, cell_j, cell_i]) == False)):
                     neighbor_indexes, neighbor_values, neighbor_numbers = compute_neighborhoods(simulation_array[i_rez],
+                                                                                                data_weight_array,
                                                                                                 cell_j,
                                                                                                 cell_i,
                                                                                                 lag_vectors,
@@ -650,7 +647,7 @@ def run_ds(data_array,
                                      cell_i] = get_value_from_training_image(training_image_array,
                                                                              ti_j,
                                                                              ti_i,
-                                                                             minmax_ti_values,
+                                                                             ti_ranges_max,
                                                                              neighbor_indexes,
                                                                              neighbor_values,
                                                                              neighbor_numbers,
@@ -664,8 +661,9 @@ def run_ds(data_array,
 
 @jit(nopython = True, nogil = True)
 def simulate_ds_realization(data_array,
+                            data_weight_array,
                             training_image_array,
-                            minmax_ti_values,
+                            ti_ranges_max,
                             distance_thresholds,
                             ti_fraction,
                             max_number_data,
@@ -693,11 +691,15 @@ def simulate_ds_realization(data_array,
                        no_data_value for the areas to simulate, math.nan for the
                        areas outside of the simulation domain). Its shape should
                        match that of the training image
+    @param data_weight_array: A NumPy array representing the conditioning weight.
+                              It should be a 3D array, with one dimension for
+                              the variable(s), and two spatial dimensions
     @param training_image_array: A NumPy array containing the training image,
                                  from which the simulated values are borrowed. 
                                  It should be a 3D array, with one dimension for
                                  the variable(s), and two spatial dimensions
-    @param minmax_ti_values: Min and max value of each variable
+    @param ti_ranges_max: Squared difference between the min and max value of 
+                          each variable
     @param distance_thresholds: The distance thresholds for each variable
     @param ti_fraction: The maximal fraction of the training image that can be 
                         covered
@@ -769,8 +771,10 @@ def simulate_ds_realization(data_array,
             cell_j, cell_i = unflatten_index(simulation_path[i_cell], simulation_array[0].shape)
             if (is_any_equal(simulation_array[:, cell_j, cell_i], no_data_value) == True
                 or (is_postproc == True
+                    and is_any_equal(data_array[:, cell_j, cell_i], no_data_value) == True
                     and is_any_nan(simulation_array[:, cell_j, cell_i]) == False)):
                 neighbor_indexes, neighbor_values, neighbor_numbers = compute_neighborhoods(simulation_array,
+                                                                                            data_weight_array,
                                                                                             cell_j,
                                                                                             cell_i,
                                                                                             lag_vectors,
@@ -788,7 +792,7 @@ def simulate_ds_realization(data_array,
                                  cell_i] = get_value_from_training_image(training_image_array,
                                                                          ti_j,
                                                                          ti_i,
-                                                                         minmax_ti_values,
+                                                                         ti_ranges_max,
                                                                          neighbor_indexes,
                                                                          neighbor_values,
                                                                          neighbor_numbers,
@@ -811,7 +815,8 @@ def run_parallel_ds(data_array,
                     neighborhood_shape = (math.inf, math.inf),
                     grid_yx_spacing = (1., 1.),
                     delta = 0.,
-                    max_non_matching_proportion = 1,
+                    conditioning_data_weight = 1.,
+                    max_non_matching_proportion = 1.,
                     start_parameter_reduction = 1,
                     reduction_factor = 1,
                     rotation_angle_array = np.empty((1, 1)),
@@ -853,6 +858,8 @@ def run_parallel_ds(data_array,
     @param delta: A weight for the neighboring cells during simulation, a high
                   delta giving more influence to the cells closer to the cell to
                   simulate
+    @param conditioning_data_weight: A weight to favor the reproduction of the
+                                     patterns around conditioning data
     @param max_non_matching_proportion: Authorized proportion of non-matching
                                         nodes, i.e., whose distance is below the
                                         threshold for the variable
@@ -894,14 +901,14 @@ def run_parallel_ds(data_array,
     if rotation_angle_array.shape != data_array.shape[-2:]:
         rotation_angle_array = np.full(data_array.shape[-2:], 0.)
     else:
-        rotation_angle_array *= np.pi/180.
+        rotation_angle_array = rotation_angle_array*np.pi/180.
     if scaling_factor_array.shape != (2, data_array.shape[-2], data_array.shape[-1]):
         scaling_factor_array = np.full((2, data_array.shape[-2], data_array.shape[-1]), 1.)
     assert math.isnan(no_data_value) == False, "The no data value cannot be NaN"
             
     random.seed(seed)
 
-    minmax_ti_values = get_minmax_array(training_image_array, variable_types)
+    ti_ranges_max = get_ranges_max_array(training_image_array, variable_types)
 
     updated_neighborhood_shape = np.empty(2)
     updated_neighborhood_shape[0] = min(data_array.shape[1], neighborhood_shape[0])
@@ -910,14 +917,21 @@ def run_parallel_ds(data_array,
                                                                   grid_yx_spacing,
                                                                   delta)
     
+    data_weight_array = np.ones(data_array.shape)
+    for index in np.ndindex(data_weight_array.shape):
+        if (data_array[index] != no_data_value
+            and math.isnan(data_array[index]) == False):
+            data_weight_array[index] = conditioning_data_weight
+    
     simulation_array = np.empty((number_realizations,
                                  data_array.shape[0],
                                  data_array.shape[1],
                                  data_array.shape[2]))
     for i_rez in prange(number_realizations):
         simulation_array[i_rez] = simulate_ds_realization(data_array,
+                                                          data_weight_array,
                                                           training_image_array,
-                                                          minmax_ti_values,
+                                                          ti_ranges_max,
                                                           distance_thresholds,
                                                           ti_fraction,
                                                           max_number_data,

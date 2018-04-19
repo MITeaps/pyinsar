@@ -124,8 +124,8 @@ def plot_interactive_slicing(array,
     raster_map_colorbar = plt.colorbar(raster_map, ax = subplots)
     raster_map_colorbar.set_label(clabel)
     if model_array is None:
-        subplot.set_xlabel(xlabel)
-    subplot.set_ylabel(ylabel)
+        subplot.set_ylabel(ylabel)
+    subplot.set_xlabel(xlabel)
 
     plt.show()
     
