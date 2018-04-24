@@ -167,7 +167,7 @@ class SentinelRamp(object):
         self._num_bursts = len(burst_list)
 
 
-        self._vel_interp = OrbitInterpolation(self._metadata['Orbit'],interp_target='velocity')
+        self._interp = OrbitInterpolation(self._metadata['Orbit'])
 
         self._lines_per_burst = int(tree.find('swathTiming/linesPerBurst').text)
         self._samples_per_burst = int(tree.find('swathTiming/samplesPerBurst').text)
@@ -226,7 +226,7 @@ class SentinelRamp(object):
         az_time_mid_burst =   az_start_time \
                             + pd.to_timedelta(self._az_time_interval*self._lines_per_burst/2,'s')
 
-        speed = np.linalg.norm(self._vel_interp(az_time_mid_burst))
+        speed = np.linalg.norm(self._interp(az_time_mid_burst, interp='velocity'))
 
         return self._az_steering_rate * 2 * speed / self._radar_lambda
 
