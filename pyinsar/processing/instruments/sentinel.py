@@ -409,3 +409,12 @@ def update_geolocation_lines(tree, azimuth_times, geolocation_data):
                                          az_time - pd.to_timedelta((sample * range_sampling_interval/2) * 1e9, 'ns'))
 
     return lines
+
+
+def get_sentinel_extents(geolocation, offset=0.0):
+    lat_min = np.min(geolocation['Latitudes']) - offset
+    lon_min = np.min(geolocation['Longitudes']) - offset
+    lat_max = np.max(geolocation['Latitudes']) + offset
+    lon_max = np.max(geolocation['Longitudes']) + offset
+
+    return lat_min, lat_max, lon_min, lon_max
