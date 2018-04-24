@@ -229,3 +229,18 @@ def keypoints_align(img1, img2, max_matches=40, invert=True):
 
 
     return(transformation_matrix[:2,:])
+
+
+class FindNearestPixel(object):
+    def __init__(self, aztime, start_date):
+        self._aztime = aztime
+        self._start_date = start_date
+
+        self._interp_func = interp1d(((aztime-start_date)/ pd.to_timedelta('1s')).as_matrix(), aztime.index, kind='linear')
+
+    def __call__(self, in_time):
+        res = self._interp_func(in_time)
+        if res.shape == tuple():
+            res = res.item()
+
+        return res
