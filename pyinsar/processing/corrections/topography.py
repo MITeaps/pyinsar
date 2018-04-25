@@ -28,7 +28,7 @@ def ellipsoidal_earth_slant_ranges(azimuth_time, latlon, orbit_interp,
 
     dates = azimuth_time[start_y:end_y]
 
-    sat_positions = np.stack(orbit_interp(dates), axis=1)
+    sat_positions = np.stack(orbit_interp(dates).T, axis=1)
 
     flat_earth_positions = np.stack(geo_to_cart(lat.ravel(), lon.ravel(), 0), axis=1)
 
