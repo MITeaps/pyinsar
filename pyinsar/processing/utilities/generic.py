@@ -232,15 +232,87 @@ def keypoints_align(img1, img2, max_matches=40, invert=True):
 
 
 class FindNearestPixel(object):
+    '''
+    Find the nearest given a time
+    '''
     def __init__(self, aztime, start_date):
+        '''
+        Initialize FindNearestPixel
+
+        @param aztime: Input azimuth time series
+        @param start_date: The starting date to use when compting the nearest pixel
+        '''
         self._aztime = aztime
         self._start_date = start_date
 
-        self._interp_func = interp1d(((aztime-start_date)/ pd.to_timedelta('1s')).as_matrix(), aztime.index, kind='linear')
+        self._interp_func = interp1d(((aztime-start_date) / pd.to_timedelta('1s')).as_matrix(), aztime.index, kind='linear')
 
     def __call__(self, in_time):
+        '''
+        Find the pixel closest to in_time.
+
+        The time is converted to a datetime based on the start_date used
+        to create this object
+
+        @param in_time: Input time
+        @return: Pixel that is closest to the input time
+        '''
         res = self._interp_func(in_time)
-        if res.shape == tuple():
+        if np.ndim(res) == 0:
             res = res.item()
 
         return res
+
+
+class AffineGlobalCoords(object):
+    '''
+    Determine global coordinates using an affine transformation
+    '''
+
+    def __init__(self, aff_coeffs, center_pixels=False):
+        '''
+        Initialize GLobal Coords Object
+
+        @param aff_coeffs: Affine coefficients
+        @param center_pixels: Apply offsets so that integer values refer to the
+                              center of the pixel and not the edge
+
+        '''
+
+        self._aff_coeffs = aff_coeffs
+
+        if center_pixels:
+            self._x_offset = 0.5
+            self._y_offset = 0.5
+
+        else:
+            self._x_offset = 0.0
+            self._y_offset = 0.0
+
+
+    def getLatLon(self, y_in, x_in):
+        '''
+        Convert pixel coordinates to geodetic coordinates
+
+        @param y_in
+        @param x_in
+        '''
+        y = y_in + self._y_offset
+        x = x_in + self._x_offset
+        return (self._aff_coeffs[3] + self._aff_coeffs[4]*x + self._aff_coeffs[5]*y,
+                self._aff_coeffs[0] + self._aff_coeffs[1]*x + self._aff_coeffs[2]*y)
+
+
+    def getXY(self, lat, lon):
+        c0 = self._aff_coeffs[0]
+        c1 = self._aff_coeffs[1]
+        c2 = self._aff_coeffs[2]
+        c3 = self._aff_coeffs[3]
+        c4 = self._aff_coeffs[4]
+        c5 = self._aff_coeffs[5]
+
+
+        y = (c4*(c0-lon) + c1*lat - c1*c3) / (c1*c5 - c2*c4)
+        x = -(c5 * (c0 - lon) + c2*lat - c2*c3) / (c1*c5 - c2*c4)
+
+        return y - self._y_offset, x - self._x_offset
