@@ -47,12 +47,11 @@ class OrbitInterpolation(object):
     Class for interpolating satellite positions
     '''
 
-    def __init__(self, orbit_data, interp_target = 'positions', time_name = 'UTC'):
+    def __init__(self, orbit_data, time_name = 'UTC'):
         '''
         Initilaize orbit interpolation object
 
         @param orbit_data: Orbit position data
-        @param interp_target: Type of interpolation. Can be positions or velocity.
         @param time_name: Name of time column name in Orbit position data. Set this to None
                           to use the data frame index
         '''
@@ -66,28 +65,34 @@ class OrbitInterpolation(object):
             self._start_date = orbit_data[time_name].iloc[0]
             self._elapsed_time = (pd.DatetimeIndex(self._orbit_data[time_name]) - self._start_date).total_seconds()
 
-        self._interp_target = interp_target
+        self._pos_labels = ['X','Y','Z']
+        self._vel_labels = ['VX', 'VY', 'VZ']
 
-        if self._interp_target == 'positions':
-            self._labels = ['X','Y','Z']
+        self._pos_interp_functions = OrderedDict()
+        self._vel_interp_functions = OrderedDict()
 
-        elif self._interp_target == 'velocity':
-            self._labels = ['VX', 'VY', 'VZ']
+        for label in self._pos_labels:
+            self._pos_interp_functions[label] = interp1d(self._elapsed_time, self._orbit_data[label], 'cubic')
 
-        else:
-            raise ValueError('Interpolation target ' + self._interp_target + ' not understood')
+        for label in self._vel_labels:
+            self._vel_interp_functions[label] = interp1d(self._elapsed_time, self._orbit_data[label], 'cubic')
 
-        self._interp_functions = OrderedDict()
+    def get_start_date(self):
+        '''
+        Get starting date used in the interpolation
 
-        for label in self._labels:
-            self._interp_functions[label] = interp1d(self._elapsed_time, self._orbit_data[label], 'cubic')
+        @return Starting date
+        '''
+        return self._start_date
 
 
-    def __call__(self, in_time, in_datetime=True):
+    def __call__(self, in_time, in_datetime=True, interp='position'):
         '''
         Compute the satellites position or velocity
 
         @param in_time: Time of interest
+        @param in_datetime: Input is a datetime object (otherwise it's assumed its seconds from start date)
+        @param interp: Interpolate "position" or "velocity"
 
         @return Satellite position or velocity at in_time
         '''
@@ -99,13 +104,22 @@ class OrbitInterpolation(object):
 
         results = []
 
-        for label in self._labels:
-            tmp_res = self._interp_functions[label](elapsed_time)
+        if interp == 'position':
+            label_list = self._pos_labels
+            data_dict = self._pos_interp_functions
+        elif interp == 'velocity':
+            label_list = self._vel_labels
+            data_dict = self._vel_interp_functions
+        else:
+            raise ValueError('Interp type {} not understood'.format(interp))
+
+        for label in label_list:
+            tmp_res = data_dict[label](elapsed_time)
             if tmp_res.ndim == 0:
                 tmp_res = tmp_res.reshape(-1)[0]
             results.append(tmp_res)
 
-        return np.array(results)
+        return np.array(results).T
 
 
 def coherence(s1, s2, window, topo_phase = 0):
@@ -215,3 +229,18 @@ def keypoints_align(img1, img2, max_matches=40, invert=True):
 
 
     return(transformation_matrix[:2,:])
+
+
+class FindNearestPixel(object):
+    def __init__(self, aztime, start_date):
+        self._aztime = aztime
+        self._start_date = start_date
+
+        self._interp_func = interp1d(((aztime-start_date)/ pd.to_timedelta('1s')).as_matrix(), aztime.index, kind='linear')
+
+    def __call__(self, in_time):
+        res = self._interp_func(in_time)
+        if res.shape == tuple():
+            res = res.item()
+
+        return res
