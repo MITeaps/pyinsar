@@ -35,7 +35,7 @@ def wrap(x, to_2pi = False):
     '''
     if to_2pi == True:
         return np.mod(x, 2.*np.pi)
-    return np.angle(np.exp(1j*(x)))
+    return np.mod(x + np.pi, 2.*np.pi) - np.pi
 
 def crop_array_from_center(array, crop_shape):
     '''
