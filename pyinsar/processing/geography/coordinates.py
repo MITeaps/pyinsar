@@ -165,26 +165,30 @@ def sample_array(array, subarray_shape, steps = (1, 1)):
     Extract all the possible sub-arrays of a given shape that do not contain any
     NaN
     
-    @param array: A 2D NumPy array
+    @param array: A nD NumPy array (at least 2D)
     @param subarray_shape: The shape of the sub-arrays
     @param steps: The step between each sub-array for each axis, to avoid 
                   sampling all the possible sub-arrays
     
-    @return The sub-arrays as a 3D NumPy array
+    @return The sub-arrays as a (n+1)D NumPy array
     '''
-    assert (len(array.shape) == 2 and len(subarray_shape) == 2), 'Array must be 2D'
+    assert (len(array.shape) >= 2 and len(subarray_shape) >= 2), 'Array must be at least 2D'
 
-    subarrays = np.empty((0,
-                          subarray_shape[0],
-                          subarray_shape[1]))
-    for j in range(0, array.shape[0], steps[0]):
-        for i in range(0, array.shape[1], steps[1]):
-            if (j + subarray_shape[0] < array.shape[0]
-                and i + subarray_shape[1] < array.shape[1]):
-                subarray = array[j:j + subarray_shape[0], i:i + subarray_shape[1]]
+    subarray = np.empty(subarray_shape)
+    subarrays = np.expand_dims(subarray, axis = 0)
+    is_empty = True
+    for j in range(0, array.shape[-2], steps[0]):
+        for i in range(0, array.shape[-1], steps[1]):
+            if (j + subarray_shape[-2] < array.shape[-2]
+                and i + subarray_shape[-1] < array.shape[-1]):
+                subarray = array[:, j:j + subarray_shape[-2], i:i + subarray_shape[-1]]
                 if np.isnan(subarray).any() == False:
-                    expanded_subarray = np.expand_dims(subarray, axis = 0)
-                    subarrays = np.concatenate((subarrays, expanded_subarray))
+                    if is_empty == True:
+                        subarrays[0] = subarray
+                        is_empty = False
+                    else:    
+                        expanded_subarray = np.expand_dims(subarray, axis = 0)
+                        subarrays = np.concatenate((subarrays, expanded_subarray))
         
     return subarrays
 
@@ -315,5 +319,64 @@ def reproject_georaster(georaster,
                               old_spatial_reference.ExportToWkt(),
                               new_spatial_reference.ExportToWkt(),
                               interpolation_method)
+
+    return new_georaster
+
+def georaster_vertical_datum_shift(georaster,
+                                   old_datum_proj4 = '+proj=longlat +datum=WGS84 +no_defs +geoidgrids=egm96_15.gtx',
+                                   new_datum_proj4 = '+proj=longlat +datum=WGS84 +no_defs',
+                                   file_type = 'MEM',
+                                   file_path = '',
+                                   data_type = gdal.GDT_Float64,
+                                   no_data_value = -99999.,
+                                   scale = 1.,
+                                   offset = 0.):
+    '''
+    Change the vertical datum of a GDAL georaster, from a geoid to an ellipsoid
+    or the other way around
+    
+    @param georaster: The GDAL georaster
+    @param old_datum_proj4: Proj4 code for the old datum, with the elevation
+                            being defined relatide to an ellipsoid or a geoid.
+                            Default value is for the EGM96 geoid, whose grid
+                            needs to be downloaded beforehand
+    @param new_datum_proj4: Proj4 code for the new datum, with the elevation
+                            being defined relatide to an ellipsoid or a geoid.
+                            Default value is for the WGS84 ellipsoid.
+    @param file_type: Type to save the file (default is memory)
+    @param file_path: Where to store the new georasterEPSG_code (default is memory)
+    @param data_type: Data type of the georaster
+    @param no_data_value: No data value for the georaster
+    @param scale: Scaling factor for the georaster
+    @param offset: Offset factor for the georaster
+    
+    @return The GDAL georaster
+    '''
+    geotransform = georaster.GetGeoTransform()
+    georaster_x_size = georaster.RasterXSize
+    georaster_y_size = georaster.RasterYSize
+
+    number_of_bands = georaster.RasterCount
+    
+    driver = gdal.GetDriverByName(file_type)
+    new_georaster = driver.Create(file_path,
+                                  georaster_x_size,
+                                  georaster_y_size,
+                                  number_of_bands,
+                                  data_type)
+    new_georaster.SetGeoTransform(geotransform)
+    new_georaster.SetProjection(new_datum_proj4)
+    for i_band in range(1, number_of_bands + 1):
+        new_georaster_band = new_georaster.GetRasterBand(i_band)
+        new_georaster_band.SetNoDataValue(no_data_value)
+        new_georaster_band.SetScale(scale)
+        new_georaster_band.SetOffset(offset)
+        # Fill the georaster band, otherwise no data values are not set in the new georaster
+        new_georaster_band.Fill(no_data_value)
+
+    res = gdal.Warp(new_georaster,
+                    georaster,
+                    srcSRS = old_datum_proj4,
+                    dstSRS = new_datum_proj4)
 
     return new_georaster
