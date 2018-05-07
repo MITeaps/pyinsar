@@ -10,6 +10,22 @@ setup(name     = package_name,
       version  = '0.0.2',
       packages = package_list,
 
+      install_requires = [
+          'numpy',
+          'pandas',
+          'scipy',
+          'python-opencv',
+          'numba',
+          'statsmodels',
+          'geodesy',
+          'GDAL',
+          'matplotlib',
+          'ipywidgets',
+          'atomicwrites',
+          'requests',
+          'setuptools'
+      ],
+
       description = 'Package of InSAR utilities',
       author = 'MITHAGI',
       author_email='skdaccess@mit.edu',
