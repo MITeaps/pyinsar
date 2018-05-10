@@ -7,7 +7,7 @@ package_name = 'pyinsar'
 package_list = find_packages()
 
 setup(name     = package_name,
-      version  = '0.0.2',
+      version  = '0.0.4',
       packages = package_list,
 
       install_requires = [
