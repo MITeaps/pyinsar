@@ -101,12 +101,14 @@ class Fault(object):
 
         deformation = np.zeros([3,*x_coords.shape])
         slip_ravel = slip.ravel()
+        rake_ravel = rake.ravel()
 
         for index in trange(len(slip_ravel)):
             x_center = self.cell_centroids[0,index]
             y_center = self.cell_centroids[1,index]
             depth = -self.cell_centroids[2,index]
             slip_value = slip_ravel[index]
+            rake_value = rake_ravel[index]
 
 
             deformation += compute_okada_displacement(fault_centroid_x = x_center,
@@ -116,7 +118,7 @@ class Fault(object):
                                                       fault_dip = self.dip,
                                                       fault_length = self.cell_length,
                                                       fault_width = self.cell_width,
-                                                      fault_rake = rake,
+                                                      fault_rake = rake_value,
                                                       poisson_ratio = self.poisson_ratio,
                                                       fault_open = 0,
                                                       xx_array = x_coords,
