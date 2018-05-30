@@ -160,7 +160,7 @@ def extract_subgeoarray(georaster_array,
     return new_georaster_array, new_georaster_extent
 
 @jit(nopython = True)
-def sample_array(array, subarray_shape, steps = (1, 1)):
+def sample_nd_array(array, subarray_shape, steps = (1, 1)):
     '''
     Extract all the possible sub-arrays of a given shape that do not contain any
     NaN
@@ -177,20 +177,49 @@ def sample_array(array, subarray_shape, steps = (1, 1)):
     subarray = np.empty(subarray_shape)
     subarrays = np.expand_dims(subarray, axis = 0)
     is_empty = True
-    for j in range(0, array.shape[-2], steps[0]):
-        for i in range(0, array.shape[-1], steps[1]):
-            if (j + subarray_shape[-2] < array.shape[-2]
-                and i + subarray_shape[-1] < array.shape[-1]):
-                subarray = array[:, j:j + subarray_shape[-2], i:i + subarray_shape[-1]]
-                if np.isnan(subarray).any() == False:
-                    if is_empty == True:
-                        subarrays[0] = subarray
-                        is_empty = False
-                    else:    
-                        expanded_subarray = np.expand_dims(subarray, axis = 0)
-                        subarrays = np.concatenate((subarrays, expanded_subarray))
+    for j in range(0, array.shape[0] - subarray_shape[0], steps[0]):
+        for i in range(0, array.shape[1] - subarray_shape[1], steps[1]):
+            subarray = array[..., j:j + subarray_shape[-2], i:i + subarray_shape[-1]]
+            if np.isnan(subarray).any() == False:
+                if is_empty == True:
+                    subarrays[0] = subarray
+                    is_empty = False
+                else:    
+                    expanded_subarray = np.expand_dims(subarray, axis = 0)
+                    subarrays = np.concatenate((subarrays, expanded_subarray))
         
     return subarrays
+
+@jit(nopython = True)
+def sample_2d_array(array, subarray_shape, steps = (1, 1)):
+    '''
+    Extract all the possible sub-arrays of a given shape that do not contain any
+    NaN
+    
+    @param array: A 2D NumPy array
+    @param subarray_shape: The shape of the sub-arrays
+    @param steps: The step between each sub-array for each axis, to avoid 
+                  sampling all the possible sub-arrays
+    
+    @return The sub-arrays as a 3D NumPy array
+    '''
+    assert (len(array.shape) == 2 and len(subarray_shape) == 2), 'Array must 2D'
+
+    subarray_indices = []
+    for j in range(0, array.shape[0] - subarray_shape[0], steps[0]):
+        for i in range(0, array.shape[1] - subarray_shape[1], steps[1]):
+            subarray = array[j:j + subarray_shape[0], i:i + subarray_shape[1]]
+            if np.isnan(subarray).any() == False:
+                subarray_indices.append((j, i))
+                
+    samples_array = np.empty((len(subarray_indices),
+                              subarray_shape[0],
+                              subarray_shape[1]))
+    for i in range(len(subarray_indices)):
+        samples_array[i] = array[subarray_indices[i][0]:subarray_indices[i][0] + subarray_shape[0],
+                                 subarray_indices[i][1]:subarray_indices[i][1] + subarray_shape[1]]
+        
+    return samples_array
 
 ################################################################################
 # Projection
@@ -239,10 +268,28 @@ def reproject_point(lon,
     
     return transform.TransformPoints([(lon, lat)])[0]
 
+def find_utm_area(longitude, latitude):
+    '''
+    Find the UTM code and hemisphere from the longitude and latitude of a point
+    
+    @param longitude: A float for the longitude
+    @param latitude: A float for the latitude
+    
+    @return A tuple with the code of the UTM zone and the hemisphere 
+            (1: northern hemisphere; 0: southern hemisphere)
+    '''
+    utm_zone = int(1 + (longitude + 180.)/6.)
+    is_northern = 1
+    if latitude < 0.:
+        is_northern = 0
+    
+    return (utm_zone, is_northern)
+
 def reproject_georaster(georaster,
                         new_cell_sizes,
                         new_projection_EPSG = None,
                         new_projection_wkt = None,
+                        new_projection_utm = None,
                         interpolation_method = gdal.GRA_Cubic,
                         file_type = 'MEM',
                         file_path = '',
@@ -258,6 +305,7 @@ def reproject_georaster(georaster,
     @param new_projection_EPSG: EPSG code of the new projection
     @param new_projection_wkt: WKT code of the new projection (can be used instead
                                of the new_projection_EPSG)
+    @param new_projection_utm: Tuple with the UTM zone code and if it's northern or not
     @param interpolation_method: Interpolation method used during the projection
     @param file_type: Type to save the file (default is memory)
     @param file_path: Where to store the new georasterEPSG_code (default is memory)
@@ -268,6 +316,8 @@ def reproject_georaster(georaster,
     
     @return The GDAL georaster
     '''
+    assert len(new_projection_utm) == 2, 'UTM projection requires a zone code and an hemisphere code'
+    
     old_spatial_reference = osr.SpatialReference()
     old_spatial_reference.ImportFromWkt(georaster.GetProjectionRef())
     old_geotransform = georaster.GetGeoTransform()
@@ -279,6 +329,8 @@ def reproject_georaster(georaster,
         new_spatial_reference.ImportFromEPSG(new_projection_EPSG)
     elif new_projection_wkt is not None:
         new_spatial_reference.ImportFromWkt(new_projection_wkt)
+    elif new_projection_utm is not None:
+        new_spatial_reference.SetUTM(new_projection_utm[0], new_projection_utm[1])
     else:
         print('No new spatial reference provided, will use the one from the georaster')
         new_spatial_reference.ImportFromWkt(georaster.GetProjectionRef())
@@ -300,10 +352,10 @@ def reproject_georaster(georaster,
     
     driver = gdal.GetDriverByName(file_type)
     new_georaster = driver.Create(file_path,
-                               int(abs(lrx - ulx)/new_cell_sizes[0]),
-                               int(abs(uly - lry)/new_cell_sizes[1]),
-                               number_of_bands,
-                               data_type)
+                                  int(abs(lrx - ulx)/new_cell_sizes[0]),
+                                  int(abs(uly - lry)/new_cell_sizes[1]),
+                                  number_of_bands,
+                                  data_type)
     new_georaster.SetGeoTransform(new_geotransform)
     new_georaster.SetProjection(new_spatial_reference.ExportToWkt())
     for i_band in range(1, number_of_bands + 1):

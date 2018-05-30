@@ -22,8 +22,69 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import os.path
 import numpy as np
 from urllib.request import urlopen
+
+################################################################################
+# Import GACOS runs
+################################################################################
+
+def read_rsc_header_file(file_path):
+    '''
+    Read the rsc header file from GACOS data
+    
+    @param file_location: The path to the file
+    
+    @return A dictionary containing the header's information
+    '''
+    header_dict = {}
+    with open(file_path) as header_file:
+        for line in header_file:
+            line_list = line.rstrip('\n').split(' ')
+            key = line_list[0]
+            value = line_list[-1]
+            try:
+                value = float(value)
+            except ValueError:
+                pass
+            header_dict[key] = value
+            
+    return header_dict
+
+def open_gacos_tropospheric_delays(tropodelay_header_path):
+    '''
+    Open a topospheric delay map computed by the Generic Atmospheric
+    Correction Online Service for InSAR (GACOS)
+    
+    @param tropodelay_header_path: Path to the header file (.ztd.rsc or .dztd.rsc)
+    
+    @return A NumPy array containing the topospheric delay in meters
+            and a tuple containing the extent of the array
+    '''
+    split_tropodelay_header_path = tropodelay_header_path.split('.')
+    assert (split_tropodelay_header_path[-1] == 'rsc'
+            and (split_tropodelay_header_path[-2] == 'ztd'
+                 or split_tropodelay_header_path[-2] == 'dztd')), 'Incorrect input format, must be .ztd.rsc or .dztd.rsc'
+    assert os.path.exists(tropodelay_header_path) == True, "Header %r doesn't exist" % header_path
+    tropodelay_file_path = '.'.join(split_tropodelay_header_path[0:-1])
+    assert os.path.exists(tropodelay_file_path) == True, "File %r doesn't exist" % file_path
+        
+    header_dict = read_rsc_header_file(tropodelay_header_path)
+
+    tropodelay_array = np.fromfile(tropodelay_file_path, dtype = np.float32)
+    tropodelay_array = tropodelay_array.reshape((int(header_dict['FILE_LENGTH']),
+                                                 int(header_dict['WIDTH'])))
+    tropodelay_extent = (header_dict['X_FIRST'] - 0.5*header_dict['X_STEP'],
+                         header_dict['X_FIRST'] + header_dict['X_STEP']*(header_dict['WIDTH'] - 1) + 0.5*header_dict['X_STEP'],
+                         header_dict['Y_FIRST'] + header_dict['Y_STEP']*(header_dict['FILE_LENGTH'] - 1) + 0.5*header_dict['Y_STEP'],
+                         header_dict['Y_FIRST'] - 0.5*header_dict['Y_STEP'])
+    
+    return tropodelay_array, tropodelay_extent
+
+################################################################################
+# Import SGEMS files
+################################################################################
 
 def open_sgems_file(file_location):
     '''
