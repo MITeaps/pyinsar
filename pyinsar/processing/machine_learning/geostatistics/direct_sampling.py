@@ -310,19 +310,19 @@ def compute_discrete_distance(training_image_array,
     return distance/sum_pattern_distance
 
 @jit(nopython = True)
-def get_value_from_training_image(training_image_array,
-                                  ti_j,
-                                  ti_i,
-                                  ti_ranges_max,
-                                  neighbor_indexes,
-                                  neighbor_values,
-                                  neighbor_numbers,
-                                  distance_thresholds,
-                                  max_non_matching_proportion,
-                                  ti_fraction,
-                                  no_data_value):
+def find_closest_cell_in_training_image(training_image_array,
+                                        ti_j,
+                                        ti_i,
+                                        ti_ranges_max,
+                                        neighbor_indexes,
+                                        neighbor_values,
+                                        neighbor_numbers,
+                                        distance_thresholds,
+                                        max_non_matching_proportion,
+                                        ti_fraction,
+                                        no_data_value):
     '''
-    Find a value in the training image so that the distance between its
+    Find a cell in the training image so that the distance between its
     neighborhood and the neighborhood in the simulation grid is lower than a
     threshold
     
@@ -347,12 +347,12 @@ def get_value_from_training_image(training_image_array,
                         covered
     @param no_data_value: The no-data value, which defines the cell to simulate
     
-    @return The value
+    @return The index of the cell
     '''
     new_ti_j = ti_j
     new_ti_i = ti_i
     number_cells = 0
-    number_valid_cells = 0
+    number_valid_cells = 0.
     min_error = math.inf
     min_distances = np.full(distance_thresholds.shape, 2.)
     distances = np.copy(min_distances)
@@ -367,28 +367,28 @@ def get_value_from_training_image(training_image_array,
             for k in range(training_image_array.shape[0]):
                 if math.isnan(ti_ranges_max[k]) == False:
                     distances[k] = compute_continuous_distance(training_image_array,
-                                                           new_ti_j,
-                                                           new_ti_i,
-                                                           ti_ranges_max,
-                                                           neighbor_indexes,
-                                                           neighbor_values,
-                                                           neighbor_numbers,
-                                                           min_distances,
-                                                           k,
-                                                           max_non_matching_proportion,
-                                                           no_data_value)
+                                                               new_ti_j,
+                                                               new_ti_i,
+                                                               ti_ranges_max,
+                                                               neighbor_indexes,
+                                                               neighbor_values,
+                                                               neighbor_numbers,
+                                                               min_distances,
+                                                               k,
+                                                               max_non_matching_proportion,
+                                                               no_data_value)
                     error += max(0., (distances[k] - distance_thresholds[k])/distance_thresholds[k])
                 else:
                     distances[k] = compute_discrete_distance(training_image_array,
-                                                         new_ti_j,
-                                                         new_ti_i,
-                                                         neighbor_indexes,
-                                                         neighbor_values,
-                                                         neighbor_numbers,
-                                                         min_distances,
-                                                         k,
-                                                         max_non_matching_proportion,
-                                                         no_data_value)
+                                                             new_ti_j,
+                                                             new_ti_i,
+                                                             neighbor_indexes,
+                                                             neighbor_values,
+                                                             neighbor_numbers,
+                                                             min_distances,
+                                                             k,
+                                                             max_non_matching_proportion,
+                                                             no_data_value)
                     error += max(0., (distances[k] - distance_thresholds[k])/distance_thresholds[k])
             if error < min_error:
                 min_error = error
@@ -407,8 +407,8 @@ def get_value_from_training_image(training_image_array,
                 new_ti_j = 0
                 
         number_cells += 1
-        
-    return training_image_array[:, min_ti_j, min_ti_i]
+    
+    return (min_ti_j, min_ti_i)
 
 @jit(nopython = True)
 def get_ranges_max_array(array, variable_types):
@@ -596,7 +596,7 @@ def run_ds(data_array,
         is_postproc = False
         for i_step in range(1 + number_postproc):
             
-            factor = 1
+            factor = 1.
             if is_postproc == True:
                 factor = postproc_factor
             
@@ -641,20 +641,25 @@ def run_ds(data_array,
                                                                                                 no_data_value)
                     ti_j = random.randint(0, training_image_array.shape[-2] - 1)
                     ti_i = random.randint(0, training_image_array.shape[-1] - 1)
-                    simulation_array[i_rez,
-                                     :,
-                                     cell_j,
-                                     cell_i] = get_value_from_training_image(training_image_array,
-                                                                             ti_j,
-                                                                             ti_i,
-                                                                             ti_ranges_max,
-                                                                             neighbor_indexes,
-                                                                             neighbor_values,
-                                                                             neighbor_numbers,
-                                                                             factored_distance_thresholds,
-                                                                             max_non_matching_proportion,
-                                                                             factored_ti_fraction,
-                                                                             no_data_value)
+                    ti_j, ti_i = find_closest_cell_in_training_image(training_image_array,
+                                                                     ti_j,
+                                                                     ti_i,
+                                                                     ti_ranges_max,
+                                                                     neighbor_indexes,
+                                                                     neighbor_values,
+                                                                     neighbor_numbers,
+                                                                     factored_distance_thresholds,
+                                                                     max_non_matching_proportion,
+                                                                     factored_ti_fraction,
+                                                                     no_data_value)
+                    for i_val in range(simulation_array.shape[1]):
+                        if data_array[i_val, cell_j, cell_i] == no_data_value:
+                            simulation_array[i_rez,
+                                             i_val,
+                                             cell_j,
+                                             cell_i] = training_image_array[i_val,
+                                                                            ti_j,
+                                                                            ti_i]
             is_postproc = True
                 
     return simulation_array
@@ -682,7 +687,7 @@ def simulate_ds_realization(data_array,
                             seed,
                             no_data_value):
     '''
-    Perform a single 2D 2D Mulitple-Point Simulation (SGS) using the Direct
+    Perform a single 2D Mulitple-Point Simulation (MPS) using the Direct
     Sampling (DS) method (Mariethoz et al., 2010, doi:10.1029/2008WR007621).
     More information about the parameters and their impact can be found in
     Meerschman et al. (2012, 10.1016/j.cageo.2012.09.019)
@@ -742,7 +747,7 @@ def simulate_ds_realization(data_array,
     is_postproc = False
     for i_step in range(1 + number_postproc):
 
-        factor = 1
+        factor = 1.
         if is_postproc == True:
             factor = postproc_factor
         
@@ -787,19 +792,24 @@ def simulate_ds_realization(data_array,
                                                                                             no_data_value)
                 ti_j = random.randint(0, training_image_array.shape[-2] - 1)
                 ti_i = random.randint(0, training_image_array.shape[-1] - 1)
-                simulation_array[:,
-                                 cell_j,
-                                 cell_i] = get_value_from_training_image(training_image_array,
-                                                                         ti_j,
-                                                                         ti_i,
-                                                                         ti_ranges_max,
-                                                                         neighbor_indexes,
-                                                                         neighbor_values,
-                                                                         neighbor_numbers,
-                                                                         factored_distance_thresholds,
-                                                                         max_non_matching_proportion,
-                                                                         factored_ti_fraction,
-                                                                         no_data_value)
+                ti_j, ti_i = find_closest_cell_in_training_image(training_image_array,
+                                                                 ti_j,
+                                                                 ti_i,
+                                                                 ti_ranges_max,
+                                                                 neighbor_indexes,
+                                                                 neighbor_values,
+                                                                 neighbor_numbers,
+                                                                 factored_distance_thresholds,
+                                                                 max_non_matching_proportion,
+                                                                 factored_ti_fraction,
+                                                                 no_data_value)
+                for i_val in range(simulation_array.shape[0]):
+                    if data_array[i_val, cell_j, cell_i] == no_data_value:
+                        simulation_array[i_val,
+                                         cell_j,
+                                         cell_i] = training_image_array[i_val,
+                                                                        ti_j,
+                                                                        ti_i]
         is_postproc = True
                 
     return simulation_array
@@ -828,7 +838,7 @@ def run_parallel_ds(data_array,
                     seed = 100,
                     no_data_value = -99999):
     '''
-    Perform a 2D Mulitple-Point Simulation (SGS) using the Direct Sampling (DS) 
+    Perform a 2D Mulitple-Point Simulation (MPS) using the Direct Sampling (DS) 
     method (Mariethoz et al., 2010, doi:10.1029/2008WR007621) with the
     realizations simulated in parallel. More information about the parameters
     and their impact can be found in Meerschman et al.

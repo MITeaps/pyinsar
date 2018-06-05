@@ -58,3 +58,16 @@ def standardize(x):
     @return A float or array
     '''
     return (x - np.nanmean(x))/np.nanstd(x)
+
+def normalize(x):
+    '''
+    Reduce and center a float or array
+    
+    @param x: The float or array
+    
+    @return A float or array
+    '''
+    x_min = np.nanmin(x)
+    x_max = np.nanmax(x)
+    
+    return (x - x_min)/(x_max - x_min)

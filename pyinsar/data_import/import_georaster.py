@@ -45,19 +45,22 @@ def open_georaster(georaster_path, read_only = True):
         
     return gdal_georaster
 
-def get_georaster_array(gdal_georaster, remove_ndv = True):
+def get_georaster_array(gdal_georaster, remove_ndv = True, as_float = True):
     '''
     Get a NumPy array from a georaster opened with GDAL
     
     @param gdal_georaster: A georaster opened with GDAL
     @param remove_ndv: Replace the no-data value as mentionned in the label by np.nan
+    @param as_float: Transform the array to a float array
     
     @return The array
     '''
     assert gdal_georaster is not None, 'No georaster available'
     
     number_of_bands = gdal_georaster.RasterCount
-    georaster_array = gdal_georaster.ReadAsArray().astype(np.float)
+    georaster_array = gdal_georaster.ReadAsArray()
+    if as_float == True:
+        georaster_array = georaster_array.astype(np.float)
     for i_band in range(number_of_bands):
         georaster_band = gdal_georaster.GetRasterBand(i_band + 1)
         no_data_value = georaster_band.GetNoDataValue()

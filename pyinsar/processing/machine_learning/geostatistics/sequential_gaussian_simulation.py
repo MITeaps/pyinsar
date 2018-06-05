@@ -98,6 +98,7 @@ def compute_axis_aligned_ellipse_range(neighborhood_range, neighborhood_azimuth_
     ux = neighborhood_range[0]*math.sin(neighborhood_azimuth_rad)
     vy = neighborhood_range[1]*math.cos(neighborhood_azimuth_rad + math.pi/2.)
     vx = neighborhood_range[1]*math.sin(neighborhood_azimuth_rad + math.pi/2.)
+
     return (math.sqrt(uy**2 + vy**2), math.sqrt(ux**2 + vx**2))
 
 @jit(nopython = True, nogil = True)
@@ -116,6 +117,7 @@ def compute_axis_aligned_neighborhood_shape(neighborhood_range,
     '''
     y_aligned_range, x_aligned_range = compute_axis_aligned_ellipse_range(neighborhood_range,
                                                                           neighborhood_azimuth)
+
     return (math.floor(y_aligned_range/grid_yx_spacing[0]),
             math.floor(x_aligned_range/grid_yx_spacing[1]))
 
@@ -203,8 +205,8 @@ def get_neighborhood(cell_index,
         i = int(cell_index[1] + neighborhood_template[i_neighbor][2])
         if (0 <= j < simulation_array.shape[0]
             and 0 <= i < simulation_array.shape[1]
-            and math.isnan(simulation_array[j, i]) == False
-            and simulation_array[j, i] != no_data_value):
+            and simulation_array[j, i] != no_data_value
+            and math.isnan(simulation_array[j, i]) == False):
             neighborhood.append((j, i))
         i_neighbor += 1
     return neighborhood[1:]

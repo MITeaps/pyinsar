@@ -1,5 +1,6 @@
 # Standard library imports
 from collections import OrderedDict
+import re
 
 # 3rd party imports
 import cv2
@@ -13,10 +14,23 @@ with warnings.catch_warnings():
 
 from scipy.signal import convolve
 from scipy.interpolate import interp1d
-from geodesy import wgs84
+# from geodesy import wgs84
 from sklearn.linear_model import RANSACRegressor
 
 
+
+def sorted_alphanumeric(l):
+    '''
+    Sort a list of strings with numbers
+ 
+    @param l: The list
+ 
+    @return The sorted list
+    '''
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    
+    return sorted(l, key = alphanum_key)
 
 def phase_shift(data, phase):
     '''

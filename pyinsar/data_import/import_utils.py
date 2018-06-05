@@ -46,16 +46,21 @@ def download_file(url, folder_path, username = None, password = None, filename =
     file_path = folder_path + filename
     
     if os.path.exists(file_path) == False:
-        with atomic_write(file_path, mode='wb') as data_file:
-            with requests.Session() as session:
-                initial_request = session.request('get', url)
-                r = session.get(initial_request.url, auth = (username, password), stream = True)
-                if r.ok:
+        with requests.Session() as session:
+            try:
+                r = session.get(url, auth = (username, password), stream = True)
+                r.raise_for_status()
+                with atomic_write(file_path, mode = 'wb') as data_file:
                     shutil.copyfileobj(r.raw, data_file)
                     return file_path
-                else:
-                    print("The file couldn't be downloaded")
-                    return None
+            except requests.exceptions.HTTPError as errh:
+                print("http error:", errh)
+            except requests.exceptions.ConnectionError as errc:
+                print("error connecting:", errc)
+            except requests.exceptions.Timeout as errt:
+                print("timeout error:", errt)
+            except requests.exceptions.RequestException as err:
+                print("error:", err)
     else:
         print('File', filename, 'already exists in', folder_path)
         return file_path
