@@ -56,14 +56,14 @@ def crop_array_from_center(array, crop_shape):
     return array[slices]
 
 
-def calc_bounding_box(image):
+def calc_bounding_box(image, threshold_function = threshold_li):
     '''
     Calcluate the bounding box around an image using the li threshold
 
     @param image: Input image
     @return Extents of a bounding box around the contents in the image (x_min, x_max, y_min, y_max)
     '''
-    thresh = threshold_li(image)
+    thresh = threshold_function(image)
     thresh_image = np.where(image < thresh, 0, 1)
     column_maximums = np.max(thresh_image, axis=0)
     row_maximums = np.max(thresh_image, axis=1)
@@ -76,18 +76,18 @@ def calc_bounding_box(image):
     return x_start, x_end, y_start, y_end
 
 
-def determine_deformation_bounding_box(deformations):
+def determine_deformation_bounding_box(deformations, **kwargs):
     '''
     Calculate the extent of the deformation in image coordinates
 
     @param deformations: Input deformations
     @return Extents deformations (x_min, x_max, y_min, y_max)
     '''
-    bounds = np.stack([calc_bounding_box(np.abs(deformations[i,:,:])) for i in range(3)])
+    bounds = np.stack([calc_bounding_box(np.abs(deformations[i,:,:]), **kwargs) for i in range(3)])
     return np.min(bounds[:,0]), np.max(bounds[:,1]), np.min(bounds[:,2]), np.max(bounds[:,3])
 
 
-def determine_x_y_bounds(deformations, x_array, y_array, offset=5000):
+def determine_x_y_bounds(deformations, x_array, y_array, offset=5000, **kwargs):
     '''
     Determine the x and y coordinates of the extent of the deformation
 
