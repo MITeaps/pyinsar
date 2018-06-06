@@ -98,9 +98,15 @@ def determine_x_y_bounds(deformations, x_array, y_array, offset=5000, **kwargs):
     @return  Extents of the deformation plus the offset (x_min, x_max, y_min, y_max)
     '''
 
-    bounding_box = determine_deformation_bounding_box(deformations)
-    x_start, x_end = x_array[0, bounding_box[:2]]
-    y_start, y_end = y_array[bounding_box[2:], 0]
+    bounding_box = determine_deformation_bounding_box(deformations, **kwargs)
+    x_start, x_end = x_array[bounding_box[2:], bounding_box[:2]]
+    y_start, y_end = y_array[bounding_box[2:], bounding_box[:2]]
+
+    if y_start > y_end:
+        tmp = y_start
+        y_start = y_end
+        y_end = tmp
+
 
     return x_start - offset, x_end + offset, y_start - offset, y_end + offset
 
