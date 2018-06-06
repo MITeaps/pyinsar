@@ -316,8 +316,6 @@ def reproject_georaster(georaster,
     
     @return The GDAL georaster
     '''
-    assert len(new_projection_utm) == 2, 'UTM projection requires a zone code and an hemisphere code'
-    
     old_spatial_reference = osr.SpatialReference()
     old_spatial_reference.ImportFromWkt(georaster.GetProjectionRef())
     old_geotransform = georaster.GetGeoTransform()
@@ -330,6 +328,7 @@ def reproject_georaster(georaster,
     elif new_projection_wkt is not None:
         new_spatial_reference.ImportFromWkt(new_projection_wkt)
     elif new_projection_utm is not None:
+        assert len(new_projection_utm) == 2, 'UTM projection requires a zone code and an hemisphere code'
         new_spatial_reference.SetUTM(new_projection_utm[0], new_projection_utm[1])
     else:
         print('No new spatial reference provided, will use the one from the georaster')
