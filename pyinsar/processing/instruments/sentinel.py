@@ -150,14 +150,17 @@ class SentinelRamp(object):
     https://sentinel.esa.int/documents/247904/1653442/Sentinel-1-TOPS-SLC_Deramping
     '''
 
-    def __init__(self, metadata):
+    def __init__(self, metadata, modulation=True):
         '''
         Initialize Sentiel Ramp
 
-        @param metadata: Elementree containing the SLC metadata
+        @param metadata: ElemenTree containing the SLC metadata
+        @param modulation: Whether to include modulation in the ramp
         '''
 
         self._metadata = metadata
+        self.modulation = modulation
+
         tree = self._metadata['Tree']
 
         burst_list = tree.findall('swathTiming/burstList/burst')
@@ -209,8 +212,14 @@ class SentinelRamp(object):
 
         doppler_centroid_frequency = doppler_centroid_frequency_func(samples)
 
-        return  -np.pi * centroid_tops * (zero_doppler_azimuth_time - ref_zero_doppler_azimuth_time)**2 \
-               - 2*np.pi * doppler_centroid_frequency * (zero_doppler_azimuth_time - ref_zero_doppler_azimuth_time)
+        ramp_phase = -np.pi * centroid_tops * (zero_doppler_azimuth_time - ref_zero_doppler_azimuth_time)**2
+        modulation_phase = -2*np.pi * doppler_centroid_frequency * (zero_doppler_azimuth_time - ref_zero_doppler_azimuth_time)
+
+        if self.modulation == True:
+            return ramp_phase + modulation_phase
+        else:
+            return ramp_phase
+
 
 
     def _doppler_centroid_rate(self, burst):
@@ -239,7 +248,19 @@ class SentinelRamp(object):
         @return Function for coluationg the doppler FM rate for a given range index
         '''
         doppler_fm_rate_t0 = float(az_fm_rate.find('t0').text)
-        doppler_fm_rate_coeffs = [float(az_fm_rate.find(label).text) for label in ['c0','c1','c2']]
+        children_names = set(child.tag for child in az_fm_rate.getchildren())
+
+        coeff_labels = ['c0','c1','c2']
+
+        if set(coeff_labels).issubset(children_names):
+            doppler_fm_rate_coeffs = [float(az_fm_rate.find(label).text) for label in coeff_labels]
+
+        elif 'azimuthFmRatePolynomial' in children_names:
+            doppler_fm_rate_coeffs = [float(val) for val in az_fm_rate.find('azimuthFmRatePolynomial').text.split(' ')]
+
+        else:
+            raise ValueError("Cannot find azimuth FM rate polynomials in metadata")
+
 
         return RampPolynomial(doppler_fm_rate_t0,
                                 doppler_fm_rate_coeffs,

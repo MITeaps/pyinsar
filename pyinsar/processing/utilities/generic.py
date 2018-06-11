@@ -56,6 +56,44 @@ def find_closest_time(time, date):
     return np.abs(time-date).idxmin()
 
 
+def rotate(col_vectors, az, ay, ax):
+    '''
+    Rotate 3 dimensional column vectors
+
+    @param col_vectors: Array of column vectors
+    @param az: Angle for rotation about the z axis
+    @param ay: Angle for rotation about the y axis
+    @param ax: Angle for rotation about the x axis
+
+    @param return Rotated vectors
+    '''
+    rz = np.array([[np.cos(az), -np.sin(az), 0], [np.sin(az), np.cos(az), 0], [0, 0, 1]])
+    ry = np.array([[np.cos(ay), 0, np.sin(ay)], [0, 1, 0], [-np.sin(ay), 0, np.cos(ay)]])
+    rx = np.array([[ 1, 0, 0], [0, np.cos(ax), -np.sin(ax)], [0, np.sin(ax), np.cos(ax)]])
+
+    rot = rx @ ry @ rz
+
+    return rot @ col_vectors
+
+def translate(col_vectors, delta_x, delta_y, delta_z):
+    '''
+    Translate 3 dimensional column vectors
+
+    @param col_vectors: Array of column vectors
+    @param delta_x: Move this many units in the x direction
+    @param delta_y: Move this many units in the y direction
+    @param delta_z: Move this many units in the z direction
+
+    @return Translated vectors
+    '''
+    col_vectors = col_vectors.copy()
+    col_vectors[0,:] += delta_x
+    col_vectors[1,:] += delta_y
+    col_vectors[2,:] += delta_z
+
+    return col_vectors
+
+
 class OrbitInterpolation(object):
     '''
     Class for interpolating satellite positions

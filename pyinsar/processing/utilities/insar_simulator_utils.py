@@ -23,6 +23,7 @@
 # THE SOFTWARE.
 
 import numpy as np
+from skimage.filters import threshold_li
 
 def wrap(x, to_2pi = False):
     '''
@@ -53,3 +54,138 @@ def crop_array_from_center(array, crop_shape):
         slices.append(slice(start, end))
         
     return array[slices]
+
+
+def calc_bounding_box(image, threshold_function = threshold_li):
+    '''
+    Calcluate the bounding box around an image using the li threshold
+
+    @param image: Input image
+    @return Extents of a bounding box around the contents in the image (x_min, x_max, y_min, y_max)
+    '''
+    thresh = threshold_function(image)
+    thresh_image = np.where(image < thresh, 0, 1)
+    column_maximums = np.max(thresh_image, axis=0)
+    row_maximums = np.max(thresh_image, axis=1)
+    x_start = np.argmax(column_maximums)
+    x_end = len(column_maximums) - np.argmax(column_maximums[::-1]) - 1
+
+    y_start = np.argmax(row_maximums)
+    y_end = len(row_maximums) - np.argmax(row_maximums[::-1]) - 1
+
+    return x_start, x_end, y_start, y_end
+
+
+def determine_deformation_bounding_box(deformations, **kwargs):
+    '''
+    Calculate the extent of the deformation in image coordinates
+
+    @param deformations: Input deformations
+    @return Extents deformations (x_min, x_max, y_min, y_max)
+    '''
+    bounds = np.stack([calc_bounding_box(np.abs(deformations[i,:,:]), **kwargs) for i in range(3)])
+    return np.min(bounds[:,0]), np.max(bounds[:,1]), np.min(bounds[:,2]), np.max(bounds[:,3])
+
+
+def determine_x_y_bounds(deformations, x_array, y_array, offset=5000, **kwargs):
+    '''
+    Determine the x and y coordinates of the extent of the deformation
+
+    @param deformations: Input deformations
+    @param x_array: x coordinates
+    @param y_array: y coordinatse
+    @param offset: Size to extend the extents of the box
+    @return  Extents of the deformation plus the offset (x_min, x_max, y_min, y_max)
+    '''
+
+    bounding_box = determine_deformation_bounding_box(deformations, **kwargs)
+    x_start, x_end = x_array[bounding_box[2:], bounding_box[:2]]
+    y_start, y_end = y_array[bounding_box[2:], bounding_box[:2]]
+
+    if y_start > y_end:
+        tmp = y_start
+        y_start = y_end
+        y_end = tmp
+
+
+    return x_start - offset, x_end + offset, y_start - offset, y_end + offset
+
+
+def generate_interferogram_from_deformation(track_angle,
+                                            min_ground_range,
+                                            height,
+                                            is_right_looking,
+                                            wavelength,
+                                            k,
+                                            deformation,
+                                            xx, yy,
+                                            projected_topography=None):
+    '''
+    Generate an interferogram from deformations
+
+    @param track_angle: Satellite track angle
+    @param min_ground_range: Minimum ground range to deformations
+    @param height: Height of satellite
+    @param is_right_looking: The satellite is looking to the right
+    @param wavelength: Wavelength of the signal
+    @param k: number of passes (1 or 2)
+    @param deformation: map of deformation
+    @param xx: x coordinates of deformation
+    @param yy: y coordinates of deformation
+    @param projected_topography: Elevation data
+
+    @return Inteferogram due to the deformations
+    '''
+
+    rad_track_angle = track_angle
+
+    cross_track_distance = xx * np.cos(rad_track_angle) - yy * np.sin(rad_track_angle)
+
+    if is_right_looking:
+        phi = 2 * np.pi - track_angle
+
+        cross_track_distance *= -1.
+
+    else:
+        phi = np.pi - track_angle
+
+    if projected_topography is not None:
+        heights = height - projected_topography
+    else:
+        heights = height
+
+    cross_track_distance -= cross_track_distance.min()
+
+    ground_range = cross_track_distance + min_ground_range
+
+    rad_look_angle = np.arctan2(ground_range, heights)
+
+    theta = np.pi - rad_look_angle
+
+    x = np.sin(theta) * np.cos(phi)
+    y = np.sin(theta) * np.sin(phi)
+    z = np.cos(theta)
+
+    look_vectors = np.stack([x, y, z])
+
+    los_deformation = np.sum(look_vectors * deformation, axis=0)
+
+    phase = -2. * np.pi * k * los_deformation / wavelength
+
+    return phase
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
