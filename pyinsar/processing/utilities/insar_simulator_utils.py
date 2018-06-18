@@ -56,6 +56,29 @@ def crop_array_from_center(array, crop_shape):
     return array[slices]
 
 
+def mask_deformation(deformation, threshold_function = threshold_li):
+    '''
+    Mask image using a threshold function
+
+    @param image: Image to mask
+    @param threshold_function: Function to calculate the threshold value
+    @return Masked image
+    '''
+
+    mask = np.zeros_like(deformation, dtype=np.bool)
+    for i in range(deformation.shape[0]):
+        thresh = threshold_function(np.abs(deformation[i,:,:]))
+        mask[i, np.abs(deformation[i,:,:]) < thresh] = True
+
+
+    mask = np.all(mask, axis=0)
+
+    deformation_masked = deformation.copy()
+    deformation_masked[:,mask] = np.nan
+
+    return deformation_masked
+
+
 def calc_bounding_box(image, threshold_function = threshold_li):
     '''
     Calcluate the bounding box around an image using the li threshold
