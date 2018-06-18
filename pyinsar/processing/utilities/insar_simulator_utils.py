@@ -99,7 +99,7 @@ def calc_bounding_box(image, threshold_function = threshold_li):
     return x_start, x_end, y_start, y_end
 
 
-def determine_deformation_bounding_box(deformations, **kwargs):
+def determine_deformation_bounding_box(deformations, largest_box=True, **kwargs):
     '''
     Calculate the extent of the deformation in image coordinates
 
@@ -107,7 +107,10 @@ def determine_deformation_bounding_box(deformations, **kwargs):
     @return Extents deformations (x_min, x_max, y_min, y_max)
     '''
     bounds = np.stack([calc_bounding_box(np.abs(deformations[i,:,:]), **kwargs) for i in range(3)])
-    return np.min(bounds[:,0]), np.max(bounds[:,1]), np.min(bounds[:,2]), np.max(bounds[:,3])
+    if largest_box:
+        return np.min(bounds[:,0]), np.max(bounds[:,1]), np.min(bounds[:,2]), np.max(bounds[:,3])
+    else:
+        return np.max(bounds[:,0]), np.min(bounds[:,1]), np.max(bounds[:,2]), np.min(bounds[:,3])
 
 
 def determine_x_y_bounds(deformations, x_array, y_array, offset=5000, **kwargs):
