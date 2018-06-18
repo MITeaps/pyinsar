@@ -201,17 +201,9 @@ def generate_interferogram_from_deformation(track_angle,
     return phase
 
 
+def los_deformation_to_phase(los_deformation, wavelength, k=2):
+    return -2. * np.pi * k * los_deformation / wavelength
 
-
-
-
-
-
-
-
-
-
-
-
-
+def phase_to_los_deformation(phase, wavelength, k=2):
+    return phase * wavelength / (2 * np.pi * k)
 
