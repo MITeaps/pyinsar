@@ -311,9 +311,9 @@ def compute_discrete_distance(training_image_array,
 
 @jit(nopython = True)
 def find_closest_cell_in_training_image(training_image_array,
-                                        ti_j,
-                                        ti_i,
                                         ti_ranges_max,
+                                        ti_indices,
+                                        ti_index,
                                         neighbor_indexes,
                                         neighbor_values,
                                         neighbor_numbers,
@@ -330,10 +330,8 @@ def find_closest_cell_in_training_image(training_image_array,
                                  from which the simulated values are borrowed. 
                                  It should be a 3D array, with one dimension for
                                  the variable(s), and two spatial dimensions
-    @param ti_j: Index along the y axis of the initial cell to visit in the
-                 training image
-    @param ti_i: Index along the x axis of the initial cell to visit in the
-                 training image
+    @param ti_indices: List of indices of the training image's cells
+    @param ti_index: Index of the initial cell to visit in the list of training image's indices
     @param ti_ranges_max: Squared difference between the min and max value of 
                           each variable
     @param neighbor_indexes: Indexes of the neighborhood from the cell to simulate
@@ -349,97 +347,100 @@ def find_closest_cell_in_training_image(training_image_array,
     
     @return The index of the cell
     '''
-    new_ti_j = ti_j
-    new_ti_i = ti_i
-    number_cells = 0
-    number_valid_cells = 0.
+    new_ti_index = ti_index
+    number_indices = 0
+    number_valid_cells = 0
     min_error = math.inf
     min_distances = np.full(distance_thresholds.shape, 2.)
     distances = np.copy(min_distances)
-    min_ti_j = ti_j
-    min_ti_i = ti_i
-    ti_size = training_image_array.shape[1]*training_image_array.shape[2]
+    min_ti_index = ti_index
+    ti_size = len(ti_indices)
     while (min_error > 0.
            and number_valid_cells/ti_size < ti_fraction
-           and number_cells < ti_size):
-        if is_any_nan(training_image_array[:, new_ti_j, new_ti_i]) == False:
-            error = 0.
-            for k in range(training_image_array.shape[0]):
-                if math.isnan(ti_ranges_max[k]) == False:
-                    distances[k] = compute_continuous_distance(training_image_array,
-                                                               new_ti_j,
-                                                               new_ti_i,
-                                                               ti_ranges_max,
-                                                               neighbor_indexes,
-                                                               neighbor_values,
-                                                               neighbor_numbers,
-                                                               min_distances,
-                                                               k,
-                                                               max_non_matching_proportion,
-                                                               no_data_value)
-                    error += max(0., (distances[k] - distance_thresholds[k])/distance_thresholds[k])
-                else:
-                    distances[k] = compute_discrete_distance(training_image_array,
-                                                             new_ti_j,
-                                                             new_ti_i,
-                                                             neighbor_indexes,
-                                                             neighbor_values,
-                                                             neighbor_numbers,
-                                                             min_distances,
-                                                             k,
-                                                             max_non_matching_proportion,
-                                                             no_data_value)
-                    error += max(0., (distances[k] - distance_thresholds[k])/distance_thresholds[k])
-            if error < min_error:
-                min_error = error
-                min_distances = np.copy(distances)
-                min_ti_j = new_ti_j
-                min_ti_i = new_ti_i
-                number_valid_cells += 1
-            elif math.isinf(error) == False:
-                number_valid_cells += 1
+           and number_indices < ti_size):
+        error = 0.
+        for k in range(training_image_array.shape[0]):
+            if math.isnan(ti_ranges_max[k]) == False:
+                distances[k] = compute_continuous_distance(training_image_array,
+                                                           ti_indices[new_ti_index][0],
+                                                           ti_indices[new_ti_index][1],
+                                                           ti_ranges_max,
+                                                           neighbor_indexes,
+                                                           neighbor_values,
+                                                           neighbor_numbers,
+                                                           min_distances,
+                                                           k,
+                                                           max_non_matching_proportion,
+                                                           no_data_value)
+                error += max(0., (distances[k] - distance_thresholds[k])/distance_thresholds[k])
+            else:
+                distances[k] = compute_discrete_distance(training_image_array,
+                                                         ti_indices[new_ti_index][0],
+                                                         ti_indices[new_ti_index][1],
+                                                         neighbor_indexes,
+                                                         neighbor_values,
+                                                         neighbor_numbers,
+                                                         min_distances,
+                                                         k,
+                                                         max_non_matching_proportion,
+                                                         no_data_value)
+                error += max(0., (distances[k] - distance_thresholds[k])/distance_thresholds[k])
+        if error < min_error:
+            min_error = error
+            min_distances = np.copy(distances)
+            min_ti_index = new_ti_index
+            number_valid_cells += 1
+        elif math.isinf(error) == False:
+            number_valid_cells += 1
         
-        new_ti_i += 1
-        if new_ti_i == training_image_array.shape[2]:
-            new_ti_i = 0
-            new_ti_j += 1
-            if new_ti_j == training_image_array.shape[1]:
-                new_ti_j = 0
-                
-        number_cells += 1
+        new_ti_index += 1
+        if new_ti_index == ti_size:
+            new_ti_index = 0
+  
+        number_indices += 1
     
-    return (min_ti_j, min_ti_i)
+    return ti_indices[min_ti_index]
 
 @jit(nopython = True)
-def get_ranges_max_array(array, variable_types):
+def prepare_training_image(array, variable_types):
     '''
     Get the squared difference between the min and max values of one or several
     variables in a 3D NumPy array, the first dimension being the variables, the
-    other two the spatial dimensions
+    other two the spatial dimensions. In addition, get the list of training
+    image's indices
     
     @param array: The array
     @param variable_types: The type of variables in the array (i.e., discrete or
                            continuous)
     
     @return The squared difference between the min and max values of each variable.
-            Discrete variables get NaN.
+            Discrete variables get NaN. And the list of indices.
     '''
     ranges_max = np.empty(array.shape[0])
+    min_values = np.full(array.shape[0], math.inf)
+    max_values = np.full(array.shape[0], -math.inf)
+    training_image_indices = []
+    for j in range(array.shape[1]):
+        for i in range(array.shape[2]):
+            are_nan = 0
+            for k in range(array.shape[0]):
+                if math.isnan(array[k, j, i]) == False:
+                    if array[k, j, i] < min_values[k]:
+                        min_values[k] = array[k, j, i]
+                    if array[k, j, i] > max_values[k]:
+                        max_values[k] = array[k, j, i]
+                else:
+                    are_nan += 1
+            if are_nan == 0:
+                training_image_indices.append((j, i))
+
     for k in range(array.shape[0]):
         if variable_types[k] == VariableType.CONTINUOUS:
-            min_value = math.inf
-            max_value = -math.inf
-            for j in range(array.shape[1]):
-                for i in range(array.shape[2]):
-                    if array[k, j, i] < min_value:
-                        min_value = array[k, j, i]
-                    if array[k, j, i] > max_value:
-                        max_value = array[k, j, i]
-            ranges_max[k] = (max_value - min_value)**2
+            ranges_max[k] = (max_values[k] - min_values[k])**2
         elif variable_types[k] == VariableType.DISCRETE:
             ranges_max[k] = math.nan
                     
-    return ranges_max
+    return ranges_max, training_image_indices
 
 @jit(nopython = True)
 def is_any_equal(list_1, value):
@@ -573,7 +574,7 @@ def run_ds(data_array,
             
     random.seed(seed)
 
-    ti_ranges_max = get_ranges_max_array(training_image_array, variable_types)
+    ti_ranges_max, ti_indices = prepare_training_image(training_image_array, variable_types)
 
     neighborhood_shape = (min(data_array.shape[1], neighborhood_shape[0]),
                           min(data_array.shape[2], neighborhood_shape[1]))
@@ -639,12 +640,11 @@ def run_ds(data_array,
                                                                                                 rotation_angle_array[cell_j, cell_i],
                                                                                                 scaling_factor_array[:, cell_j, cell_i],
                                                                                                 no_data_value)
-                    ti_j = random.randint(0, training_image_array.shape[-2] - 1)
-                    ti_i = random.randint(0, training_image_array.shape[-1] - 1)
+                    ti_index = random.randrange(0, len(ti_indices))
                     ti_j, ti_i = find_closest_cell_in_training_image(training_image_array,
-                                                                     ti_j,
-                                                                     ti_i,
                                                                      ti_ranges_max,
+                                                                     ti_indices,
+                                                                     ti_index,
                                                                      neighbor_indexes,
                                                                      neighbor_values,
                                                                      neighbor_numbers,
@@ -669,6 +669,7 @@ def simulate_ds_realization(data_array,
                             data_weight_array,
                             training_image_array,
                             ti_ranges_max,
+                            ti_indices,
                             distance_thresholds,
                             ti_fraction,
                             max_number_data,
@@ -790,12 +791,11 @@ def simulate_ds_realization(data_array,
                                                                                             rotation_angle_array[cell_j, cell_i],
                                                                                             scaling_factor_array[:, cell_j, cell_i],
                                                                                             no_data_value)
-                ti_j = random.randint(0, training_image_array.shape[-2] - 1)
-                ti_i = random.randint(0, training_image_array.shape[-1] - 1)
+                ti_index = random.randrange(0, len(ti_indices))
                 ti_j, ti_i = find_closest_cell_in_training_image(training_image_array,
-                                                                 ti_j,
-                                                                 ti_i,
                                                                  ti_ranges_max,
+                                                                 ti_indices,
+                                                                 ti_index,
                                                                  neighbor_indexes,
                                                                  neighbor_values,
                                                                  neighbor_numbers,
@@ -918,7 +918,7 @@ def run_parallel_ds(data_array,
             
     random.seed(seed)
 
-    ti_ranges_max = get_ranges_max_array(training_image_array, variable_types)
+    ti_ranges_max, ti_indices = prepare_training_image(training_image_array, variable_types)
 
     updated_neighborhood_shape = np.empty(2)
     updated_neighborhood_shape[0] = min(data_array.shape[1], neighborhood_shape[0])
@@ -942,6 +942,7 @@ def run_parallel_ds(data_array,
                                                           data_weight_array,
                                                           training_image_array,
                                                           ti_ranges_max,
+                                                          ti_indices,
                                                           distance_thresholds,
                                                           ti_fraction,
                                                           max_number_data,
