@@ -34,7 +34,7 @@ class Fault(object):
     Model a fault as a collection of small okada faults
     '''
     def __init__(self, x_center, y_center, depth, length, width, strike, dip, num_elements_length, num_elements_width,
-                 poisson_ratio = 0.25):
+                 poisson_ratio = 0.25, dtype=np.float32):
         '''
         Initialize Fault object
 
@@ -56,17 +56,18 @@ class Fault(object):
         self.strike = strike
         self.dip = dip
         self.poisson_ratio = 0.25
+        self._dtype = dtype
 
         # Generate rectangular centroids
         self.cell_width = self.width / num_elements_width
         self.cell_length = self.length / num_elements_length
 
-        cell_x_coords = np.linspace(self.cell_length/2 - self.length/2, self.length/2 - self. cell_length/2, num_elements_length)
-        cell_z_coords = np.linspace(self.cell_width/2 - self.width/2, self.width/2 - self.cell_width/2, num_elements_width)
+        cell_x_coords = np.linspace(self.cell_length/2 - self.length/2, self.length/2 - self. cell_length/2, num_elements_length, dtype=dtype)
+        cell_z_coords = np.linspace(self.cell_width/2 - self.width/2, self.width/2 - self.cell_width/2, num_elements_width, dtype=dtype)
 
         cell_x_centroids, cell_z_centroids = np.meshgrid(cell_x_coords, cell_z_coords)
 
-        cell_centroids = np.zeros([3, len(cell_x_centroids.ravel())])
+        cell_centroids = np.zeros([3, len(cell_x_centroids.ravel())], dtype=dtype)
         cell_centroids[0,:] = cell_x_centroids.ravel()
         cell_centroids[2,:] = cell_z_centroids.ravel()
 
@@ -78,8 +79,8 @@ class Fault(object):
         x_angle = np.pi/2 - self.dip
         z_angle = -self.strike - np.pi/2
 
-        cell_centroids = rotate(cell_centroids, 0, 0, x_angle)
-        cell_centroids = rotate(cell_centroids, z_angle, 0, 0)
+        cell_centroids = rotate(cell_centroids, 0, 0, x_angle, dtype=dtype)
+        cell_centroids = rotate(cell_centroids, z_angle, 0, 0, dtype=dtype)
 
         cell_centroids = translate(cell_centroids, x_center, y_center, -depth)
 
@@ -99,7 +100,7 @@ class Fault(object):
         @return Surface deformations at specificed coordinates
         '''
 
-        deformation = np.zeros([3,*x_coords.shape])
+        deformation = np.zeros([3,*x_coords.shape], dtype=self._dtype)
         slip_ravel = slip.ravel()
         rake_ravel = rake.ravel()
 

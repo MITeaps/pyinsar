@@ -56,7 +56,7 @@ def find_closest_time(time, date):
     return np.abs(time-date).idxmin()
 
 
-def rotate(col_vectors, az, ay, ax):
+def rotate(col_vectors, az, ay, ax, dtype=np.float64):
     '''
     Rotate 3 dimensional column vectors
 
@@ -67,9 +67,9 @@ def rotate(col_vectors, az, ay, ax):
 
     @param return Rotated vectors
     '''
-    rz = np.array([[np.cos(az), -np.sin(az), 0], [np.sin(az), np.cos(az), 0], [0, 0, 1]])
-    ry = np.array([[np.cos(ay), 0, np.sin(ay)], [0, 1, 0], [-np.sin(ay), 0, np.cos(ay)]])
-    rx = np.array([[ 1, 0, 0], [0, np.cos(ax), -np.sin(ax)], [0, np.sin(ax), np.cos(ax)]])
+    rz = np.array([[np.cos(az), -np.sin(az), 0], [np.sin(az), np.cos(az), 0], [0, 0, 1]], dtype=dtype)
+    ry = np.array([[np.cos(ay), 0, np.sin(ay)], [0, 1, 0], [-np.sin(ay), 0, np.cos(ay)]], dtype=dtype)
+    rx = np.array([[ 1, 0, 0], [0, np.cos(ax), -np.sin(ax)], [0, np.sin(ax), np.cos(ax)]], dtype=dtype)
 
     rot = rx @ ry @ rz
 

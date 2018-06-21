@@ -36,7 +36,7 @@ import numpy as np
 
 from skdaccess.utilities.image_util import SplineGeolocation
 
-def read_srcmod_data(srcmod_data):
+def read_srcmod_data(srcmod_data, dtype=np.float64):
     '''
     Generate faults of okada sources from src mod mat files.
 
@@ -72,16 +72,13 @@ def read_srcmod_data(srcmod_data):
     #                                 y_spline=y_spline)
 
 
-    
-
-
     lat = srcmod_data['geoLAT']
     lon = srcmod_data['geoLON']
 
     # Size of the subfaults
     Dz, Dx = srcmod_data['invDzDx']
 
-    # Number of the subfaults
+    # Number of the subfault
     Nz, Nx = srcmod_data['invNzNx'].astype(int)
 
     # Number of time windows
@@ -89,7 +86,7 @@ def read_srcmod_data(srcmod_data):
 
     def get_data_from_time_windows(data, prefix, alternate_column, num_windows, Nx, Nz, alternate_value=None):
         if prefix + 'TW1' in data.keys():
-            new_data = np.zeros([num_time_windows, Nz, Nx])
+            new_data = np.zeros([num_time_windows, Nz, Nx], dtype=np.float32)
 
             for num in range(1, num_windows+1):
                 new_data[num-1,:,:] = np.fliplr(np.flipud(data[prefix+'TW' + str(num)]))
@@ -99,7 +96,7 @@ def read_srcmod_data(srcmod_data):
             new_data = new_data.reshape(1, *new_data.shape)
 
         else:
-            new_data = np.ones([1, Nz, Nx])
+            new_data = np.ones([1, Nz, Nx], dtype=dtype)
             new_data[0,:,:] = data[alternate_value]
 
         return new_data
@@ -130,21 +127,21 @@ def read_srcmod_data(srcmod_data):
     # the fault is at 0,0,0
     hypx_col_vec = np.array([[center_z - width / 2], 
                              [ center_x - length/2],
-                             [                   0]])
+                             [                   0]], dtype=dtype)
 
     # SRCMOD's defintion of the centroid (center of cell in x, top in
     # z)
     # This used for comparing with the positions in the srcmod file
     compare_hypx_col_vec = np.array([[-Dz/2],
                                      [    0],
-                                     [    0]])
+                                     [    0]], dtype=dtype)
 
     # Rotate the fault to put in a new coordinate system (x->EW,
     # y->NS)
-    hypo_center_coords = rotate(rotate(hypx_col_vec, 0, fault_dip, 0), -fault_strike, 0, 0)
+    hypo_center_coords = rotate(rotate(hypx_col_vec, 0, fault_dip, 0, dtype=dtype), -fault_strike, 0, 0, dtype=dtype)
 
     # Rotating the srcmod's definition of a centroid
-    compare_center_coords = rotate(rotate(compare_hypx_col_vec, 0, fault_dip, 0), -fault_strike, 0, 0)
+    compare_center_coords = rotate(rotate(compare_hypx_col_vec, 0, fault_dip, 0, dtype=dtype), -fault_strike, 0, 0, dtype=dtype)
 
     # Determine the centroid of the fault
     fault_center = -hypo_center_coords
@@ -153,14 +150,14 @@ def read_srcmod_data(srcmod_data):
 
     # Create fault
     fault = Fault(*fault_center, length*1000, width*1000,
-                  fault_strike, fault_dip, Nx, Nz)
+                  fault_strike, fault_dip, Nx, Nz, dtype=dtype)
 
     # Determine the centroids of each subfault that srcmod uses
     compare_with_provided_centers = translate(fault.cell_centroids[:,::-1]/1000, *compare_center_coords)
 
     if not np.allclose(compare_with_provided_centers, np.stack([ srcmod_data['geoX'].ravel(),
                                                                  srcmod_data['geoY'].ravel(),
-                                                                -srcmod_data['geoZ'].ravel()])):
+                                                                 -srcmod_data['geoZ'].ravel()]), atol=1e-3):
 
         raise RuntimeError("Unable to recreate srcmod's centroids!")
 
