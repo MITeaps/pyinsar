@@ -138,14 +138,16 @@ def determine_x_y_bounds(deformations, x_array, y_array, offset=5000, **kwargs):
 
 
 def generate_interferogram_from_deformation(track_angle,
-                                            min_ground_range,
-                                            height,
+                                            min_ground_range_1,
+                                            height_1,
                                             is_right_looking,
                                             wavelength,
                                             k,
                                             deformation,
                                             xx, yy,
-                                            projected_topography=None):
+                                            projected_topography=None,
+                                            min_ground_range_2 = None,
+                                            height_2 = None):
     '''
     Generate an interferogram from deformations
 
@@ -169,41 +171,41 @@ def generate_interferogram_from_deformation(track_angle,
 
     if is_right_looking:
         phi = 2 * np.pi - track_angle
-
         cross_track_distance *= -1.
 
     else:
         phi = np.pi - track_angle
 
+    cross_track_deformation = deformation[0,:,:] * np.cos(phi) + deformation[1,:,:] * np.sin(phi)
+
+    if height_2 is None:
+        height_2 = height_1
+
+    if min_ground_range_2 is None:
+        min_ground_range_2 = min_ground_range_1
+
     if projected_topography is not None:
-        heights = height - projected_topography
+        corrected_height_1 = height_1 - projected_topography
+        corrected_height_2 = height_2 - projected_topography
     else:
-        heights = height
+        corrected_height_1 = height_1
+        corrected_height_2 = height_2
 
     cross_track_distance -= cross_track_distance.min()
 
-    ground_range = cross_track_distance + min_ground_range
+    ground_range_1 = cross_track_distance + min_ground_range_1
+    ground_range_2 = cross_track_distance + min_ground_range_2 + deformation[2,:,:]
 
-    rad_look_angle = np.arctan2(ground_range, heights)
+    slant_range_1 = np.sqrt(corrected_height_1**2 + ground_range_1**2)
+    slant_range_2 = np.sqrt(corrected_height_2**2 + ground_range_2**2) + cross_track_deformation
 
-    theta = np.pi - rad_look_angle
-
-    x = np.sin(theta) * np.cos(phi)
-    y = np.sin(theta) * np.sin(phi)
-    z = np.cos(theta)
-
-    look_vectors = np.stack([x, y, z])
-
-    los_deformation = np.sum(look_vectors * deformation, axis=0)
-
-    phase = -2. * np.pi * k * los_deformation / wavelength
+    phase = change_in_range_to_phase(slant_range_2 - slant_range_1, wavelength)
 
     return phase
 
 
-def los_deformation_to_phase(los_deformation, wavelength, k=2):
+def change_in_range_to_phase(los_deformation, wavelength, k=2):
     return -2. * np.pi * k * los_deformation / wavelength
 
-def phase_to_los_deformation(phase, wavelength, k=2):
-    return phase * wavelength / (2 * np.pi * k)
-
+def phase_to_change_in_range(phase, wavelength, k=2):
+    return -phase * wavelength / (2 * np.pi * k)
