@@ -11,7 +11,7 @@
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in
 # all copies or substantial portions of the Software.
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -28,10 +28,10 @@ from skimage.filters import threshold_li
 def wrap(x, to_2pi = False):
     '''
     Wrap a float or an array
-    
+
     @param x: The float or array
     @param to_2pi: If True, wrap to [0, 2pi) instead of [-pi, pi]
-    
+
     @return The wrapped array (in radian between -pi and pi)
     '''
     if to_2pi == True:
@@ -41,10 +41,10 @@ def wrap(x, to_2pi = False):
 def crop_array_from_center(array, crop_shape):
     '''
     Crop an array along its borders
-    
+
     @param array: The array
     @param crop_shape: The number of cells to remove along the y and x axes
-    
+
     @return The cropped array
     '''
     slices = []
@@ -52,7 +52,7 @@ def crop_array_from_center(array, crop_shape):
         start = array.shape[i]//2 - crop_shape[i]//2
         end = start + crop_shape[i]
         slices.append(slice(start, end))
-        
+
     return array[slices]
 
 
