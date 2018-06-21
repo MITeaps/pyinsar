@@ -6,6 +6,7 @@ import numpy as np
 from scipy.constants import c
 from tqdm import tqdm
 from skimage.filters import threshold_otsu
+import gdal
 
 from pyinsar.processing.utilities import insar_simulator_utils
 from pyinsar.processing.geography.coordinates import compute_x_and_y_coordinates_maps
@@ -47,21 +48,27 @@ def generate_minimum_ground_range_limits(satellite_height, incidence_ranges, ima
 
 
 def generate_phase_samples_from_looks_and_ranges(deformation_list, xx, yy, satellite_height, track_angles, minimum_ground_ranges,
-                                                 size = (100,100)):
-
-    params = []
-    phases = []
+                                                 size = (100,100), dtype=np.float32):
 
     radar_wavelength = c / 5.405000454334350e+09
+
+    num_images = len(track_angles) * len(minimum_ground_ranges) * len(deformation_list)
+    phases = np.zeros([num_images] + list(size), dtype=dtype)
+    params = np.zeros([num_images, 2], np.int)
+
+    index = 0
 
     for deformation in tqdm(deformation_list):
         for angle in track_angles:
             for ground_range in minimum_ground_ranges:
-                phases.append(insar_simulator_utils.generate_interferogram_from_deformation(angle, ground_range, satellite_height, True,
-                                                                      radar_wavelength, 2, deformation, xx, yy, 0))
-                params.append((angle, ground_range))
+                phases[index, :, :] = insar_simulator_utils.generate_interferogram_from_deformation(angle, ground_range, satellite_height, True,
+                                                                                                    radar_wavelength, 2, deformation, xx, yy, 0)
+                params[index,0] = angle
+                params[index,0] = ground_range
 
-    return np.array(params), np.array(phases)
+                index +=1
+
+    return params, phases
 
 def generate_phase_samples(deformation, satellite_height, radar_wavelength, cell_size, image_size, stride=20):
     x_bound_start, x_bound_end, y_bound_start, y_bound_end = determine_x_y_bounds(deformation, x_coords, y_coords,offset=0,
@@ -145,9 +152,10 @@ def retrieve_data(index, index_dict, data_file, size):
 
 class DataRetriever(object):
 
-    def __init__(self, file_name_list, label_list, size):
+    def __init__(self, file_name_list, label_list, size, chunk_size = 1000):
         self.label_list = label_list
         self.size = list(size)
+        self.chunk_size = 1000
 
         self.data_file_dict = OrderedDict()
         for file_name, label in zip(file_name_list, self.label_list):
@@ -187,7 +195,22 @@ class DataRetriever(object):
 
         sorted_index = np.argsort(index)
 
-        return self.data_file_dict[label]['data_file'][dataset_name][index[sorted_index],:,:][sorted_index,:,:]
+        if self.chunk_size is None or self.chunk_size == 0:
+            return self.data_file_dict[label]['data_file'][dataset_name][index[sorted_index],:,:][sorted_index,:,:]
+
+        else:
+            data_shape = self.data_file_dict[label]['data_file'][dataset_name].shape
+            dtype = self.data_file_dict[label]['data_file'][dataset_name].dtype
+
+            return_data = np.zeros([len(index)] + list(data_shape[1:]), dtype = dtype)
+
+            sorted_index_list = np.split(index[sorted_index], range(self.chunk_size, len(index), self.chunk_size))
+            return_index = np.split(sorted_index, range(self.chunk_size, len(index), self.chunk_size))
+
+            for index_chunk, return_index_chunk in zip(sorted_index_list, return_index):
+                return_data[return_index_chunk] = self.data_file_dict[label]['data_file'][dataset_name][index_chunk,:,:]
+
+            return return_data
 
 
     def _get_images_from_label(self, label, index):
@@ -223,3 +246,33 @@ class DataRetriever(object):
             image_data[label_index,:,:] = self._get_images_from_label(label, index[label_index, 1])
 
         return image_data
+
+
+def rotate_image_list(in_image_extents, in_image_list, progress=True):
+
+    new_image_data = np.zeros([len(in_image_extents)*4, 100, 100], dtype=in_image_list[0].dtype)
+    new_image_extents = np.zeros([len(in_image_extents)*4, 4], dtype=np.int)
+
+    index = 0
+    for image, extents in tqdm(zip(in_image_list, in_image_extents), total=len(in_image_list), disable = not progress):
+        for i in range(4):
+            new_image_data[index,:,:] = np.rot90(image, i)
+            new_image_extents[index,:] = extents
+
+    return new_image_extents, new_image_data
+
+
+
+def project_insar_data(in_dataset, lon_center, lat_center, interpolation=gdal.GRA_Cubic,
+                       no_data_value=np.nan, data_type=gdal.GDT_Float64):
+
+
+    spatial = osr.SpatialReference()
+    spatial.ImportFromProj4(f'+proj=tmerc +lat_0={lat_center} +lon_0={lon_center} +datum=WGS84 +ellps=WGS84 +k=0.9996 +no_defs')
+    reprojected_dataset = reproject_georaster(georaster=in_dataset,
+                                              interpolation_method=interpolation,
+                                              new_cell_sizes=[100,100],
+                                              new_projection_wkt=spatial.ExportToWkt(),
+                                              no_data_value=no_data_value,
+                                              data_type=data_type)
+    return reprojected_dataset.ReadAsArray()
