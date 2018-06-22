@@ -176,7 +176,7 @@ def generate_interferogram_from_deformation(track_angle,
     else:
         phi = np.pi - track_angle
 
-    cross_track_deformation = deformation[0,:,:] * np.cos(phi) + deformation[1,:,:] * np.sin(phi)
+    cross_track_deformation = deformation[0,:,:].astype(np.float64) * np.cos(phi) + deformation[1,:,:].astype(np.float64) * np.sin(phi)
 
     if height_2 is None:
         height_2 = height_1
@@ -191,15 +191,80 @@ def generate_interferogram_from_deformation(track_angle,
         corrected_height_1 = height_1
         corrected_height_2 = height_2
 
+    corrected_height_2 -= deformation[2,:,:].astype(np.float64)
+
     cross_track_distance -= cross_track_distance.min()
 
     ground_range_1 = cross_track_distance + min_ground_range_1
-    ground_range_2 = cross_track_distance + min_ground_range_2 + deformation[2,:,:]
+    ground_range_2 = cross_track_distance + min_ground_range_2 + cross_track_deformation
 
     slant_range_1 = np.sqrt(corrected_height_1**2 + ground_range_1**2)
-    slant_range_2 = np.sqrt(corrected_height_2**2 + ground_range_2**2) + cross_track_deformation
+    slant_range_2 = np.sqrt(corrected_height_2**2 + ground_range_2**2)
 
-    phase = change_in_range_to_phase(slant_range_2 - slant_range_1, wavelength)
+    phase = change_in_range_to_phase(slant_range_1 - slant_range_2, wavelength)
+
+    return phase
+
+def old_generate_interferogram_from_deformation(track_angle,
+                                                min_ground_range,
+                                                height,
+                                                is_right_looking,
+                                                wavelength,
+                                                k,
+                                                deformation,
+                                                xx, yy,
+                                                projected_topography=None):
+    '''
+    Generate an interferogram from deformations
+
+    @param track_angle: Satellite track angle
+    @param min_ground_range: Minimum ground range to deformations
+    @param height: Height of satellite
+    @param is_right_looking: The satellite is looking to the right
+    @param wavelength: Wavelength of the signal
+    @param k: number of passes (1 or 2)
+    @param deformation: map of deformation
+    @param xx: x coordinates of deformation
+    @param yy: y coordinates of deformation
+    @param projected_topography: Elevation data
+
+    @return Inteferogram due to the deformations
+    '''
+
+    rad_track_angle = track_angle
+
+    cross_track_distance = xx * np.cos(rad_track_angle) - yy * np.sin(rad_track_angle)
+
+    if is_right_looking:
+        phi = 2 * np.pi - track_angle
+
+        cross_track_distance *= -1.
+
+    else:
+        phi = np.pi - track_angle
+
+    if projected_topography is not None:
+        heights = height - projected_topography
+    else:
+        heights = height
+
+    cross_track_distance -= cross_track_distance.min()
+
+    ground_range = cross_track_distance + min_ground_range
+
+    rad_look_angle = np.arctan2(ground_range, heights)
+
+    theta = np.pi - rad_look_angle
+
+    x = np.sin(theta) * np.cos(phi)
+    y = np.sin(theta) * np.sin(phi)
+    z = np.cos(theta)
+
+    look_vectors = np.stack([x, y, z])
+
+    los_deformation = np.sum(look_vectors * deformation, axis=0)
+
+    phase = 2. * np.pi * k * los_deformation / wavelength
 
     return phase
 
