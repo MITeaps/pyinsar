@@ -193,8 +193,7 @@ def sample_nd_array(array, subarray_shape, steps = (1, 1)):
 @jit(nopython = True)
 def sample_2d_array(array, subarray_shape, steps = (1, 1)):
     '''
-    Extract all the possible sub-arrays of a given shape that do not contain any
-    NaN
+    Extract all the possible sub-arrays that do not contain any NaN
     
     @param array: A 2D NumPy array
     @param subarray_shape: The shape of the sub-arrays
@@ -203,7 +202,7 @@ def sample_2d_array(array, subarray_shape, steps = (1, 1)):
     
     @return The sub-arrays as a 3D NumPy array
     '''
-    assert (len(array.shape) == 2 and len(subarray_shape) == 2), 'Array must 2D'
+    assert (len(array.shape) == 2 and len(subarray_shape) == 2), 'Array must be 2D'
 
     subarray_indices = []
     for j in range(0, array.shape[0] - subarray_shape[0], steps[0]):
@@ -217,6 +216,40 @@ def sample_2d_array(array, subarray_shape, steps = (1, 1)):
                               subarray_shape[1]))
     for i in range(len(subarray_indices)):
         samples_array[i] = array[subarray_indices[i][0]:subarray_indices[i][0] + subarray_shape[0],
+                                 subarray_indices[i][1]:subarray_indices[i][1] + subarray_shape[1]]
+        
+    return samples_array
+
+@jit(nopython = True)
+def sample_2d_multiarray(array, subarray_shape, steps = (1, 1)):
+    '''
+    Extract all the possible sub-arrays that do not contain any NaN
+    
+    @param array: A 3D NumPy array. The first dimension represents the variables,
+                  the other two the x and y axis.
+    @param subarray_shape: The 2D shape of the sub-arrays
+    @param steps: The step between each sub-array for each axis, to avoid 
+                  sampling all the possible sub-arrays
+    
+    @return The sub-arrays as a 4D NumPy array
+    '''
+    assert len(array.shape) == 3, 'Array must be 3D'
+    assert len(subarray_shape) == 2, 'Subarray shape must be 2D'
+
+    subarray_indices = []
+    for j in range(0, array.shape[1] - subarray_shape[0], steps[0]):
+        for i in range(0, array.shape[2] - subarray_shape[1], steps[1]):
+            subarray = array[:, j:j + subarray_shape[0], i:i + subarray_shape[1]]
+            if np.isnan(subarray).any() == False:
+                subarray_indices.append((j, i))
+                
+    samples_array = np.empty((len(subarray_indices),
+                              array.shape[0],
+                              subarray_shape[0],
+                              subarray_shape[1]))
+    for i in range(len(subarray_indices)):
+        samples_array[i] = array[:,
+                                 subarray_indices[i][0]:subarray_indices[i][0] + subarray_shape[0],
                                  subarray_indices[i][1]:subarray_indices[i][1] + subarray_shape[1]]
         
     return samples_array
