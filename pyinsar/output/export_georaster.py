@@ -32,7 +32,8 @@ def create_georaster_from_array(georaster_array,
                                 data_type = gdal.GDT_Float64,
                                 no_data_value = -99999.,
                                 scale = 1.,
-                                offset = 0.):
+                                offset = 0.,
+                                options = []):
     '''
     Create a GDAL georaster from a Numpy array
     
@@ -45,6 +46,7 @@ def create_georaster_from_array(georaster_array,
     @param no_data_value: No data value for the georaster
     @param scale: Scaling factor for the georaster
     @param offset: Offset factor for the georaster
+    @param options: List of options for compression
     
     @return The GDAL georaster
     '''
@@ -61,7 +63,8 @@ def create_georaster_from_array(georaster_array,
                                   georaster_x_size,
                                   georaster_y_size,
                                   number_of_bands,
-                                  data_type)
+                                  data_type,
+                                  options = options)
     new_georaster.SetGeoTransform(geotransform)
     new_georaster.SetProjection(projection)
     
