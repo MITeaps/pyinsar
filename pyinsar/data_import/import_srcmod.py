@@ -86,7 +86,7 @@ def read_srcmod_data(srcmod_data, dtype=np.float64):
 
     def get_data_from_time_windows(data, prefix, alternate_column, num_windows, Nx, Nz, alternate_value=None):
         if prefix + 'TW1' in data.keys():
-            new_data = np.zeros([num_time_windows, Nz, Nx], dtype=np.float32)
+            new_data = np.zeros([num_time_windows, Nz, Nx], dtype=dtype)
 
             for num in range(1, num_windows+1):
                 new_data[num-1,:,:] = np.fliplr(np.flipud(data[prefix+'TW' + str(num)]))
