@@ -36,7 +36,7 @@ import numpy as np
 
 from skdaccess.utilities.image_util import SplineGeolocation
 
-def read_srcmod_data(srcmod_data, dtype=np.float64):
+def read_srcmod_data(srcmod_data, dtype=np.float64, skip_sanity_check=False):
     '''
     Generate faults of okada sources from src mod mat files.
 
@@ -155,7 +155,8 @@ def read_srcmod_data(srcmod_data, dtype=np.float64):
     # Determine the centroids of each subfault that srcmod uses
     compare_with_provided_centers = translate(fault.cell_centroids[:,::-1]/1000, *compare_center_coords)
 
-    if not np.allclose(compare_with_provided_centers, np.stack([ srcmod_data['geoX'].ravel(),
+
+    if not skip_sanity_check and not np.allclose(compare_with_provided_centers, np.stack([ srcmod_data['geoX'].ravel(),
                                                                  srcmod_data['geoY'].ravel(),
                                                                  -srcmod_data['geoZ'].ravel()]), atol=1e-3):
 
