@@ -304,12 +304,12 @@ class FindNearestPixel(object):
 
 class AffineGlobalCoords(object):
     '''
-    Determine global coordinates using an affine transformation
+    Convert between projected and raster coordinates using an affine transformation
     '''
 
     def __init__(self, aff_coeffs, center_pixels=False):
         '''
-        Initialize GLobal Coords Object
+        Initialize Global Coords Object
 
         @param aff_coeffs: Affine coefficients
         @param center_pixels: Apply offsets so that integer values refer to the
