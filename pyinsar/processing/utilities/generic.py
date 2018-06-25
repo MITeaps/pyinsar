@@ -328,20 +328,25 @@ class AffineGlobalCoords(object):
             self._y_offset = 0.0
 
 
-    def getLatLon(self, y_in, x_in):
+    def getProjectedYX(self, y_array, x_array):
         '''
-        Convert pixel coordinates to geodetic coordinates
+        Convert pixel coordinates to projected coordinates
 
         @param y_in
         @param x_in
         '''
-        y = y_in + self._y_offset
-        x = x_in + self._x_offset
+        y = y_array + self._y_offset
+        x = x_array + self._x_offset
         return (self._aff_coeffs[3] + self._aff_coeffs[4]*x + self._aff_coeffs[5]*y,
                 self._aff_coeffs[0] + self._aff_coeffs[1]*x + self._aff_coeffs[2]*y)
 
 
-    def getXY(self, lat, lon):
+    def getRasterYX(self, y_proj, x_proj):
+        '''
+        Convert from projected coordinates to pixel coordinates
+
+        @
+        '''
         c0 = self._aff_coeffs[0]
         c1 = self._aff_coeffs[1]
         c2 = self._aff_coeffs[2]
@@ -350,7 +355,7 @@ class AffineGlobalCoords(object):
         c5 = self._aff_coeffs[5]
 
 
-        y = (c4*(c0-lon) + c1*lat - c1*c3) / (c1*c5 - c2*c4)
-        x = -(c5 * (c0 - lon) + c2*lat - c2*c3) / (c1*c5 - c2*c4)
+        y = (c4*(c0-x_proj) + c1*y_proj - c1*c3) / (c1*c5 - c2*c4)
+        x = -(c5 * (c0 - x_proj) + c2*y_proj - c2*c3) / (c1*c5 - c2*c4)
 
         return y - self._y_offset, x - self._x_offset
