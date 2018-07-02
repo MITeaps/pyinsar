@@ -88,7 +88,7 @@ class Fault(object):
 
 
 
-    def generateDeformation(self, slip, rake, x_coords, y_coords):
+    def generateDeformation(self, slip, rake, x_coords, y_coords, simple=True):
         '''
         Generate surface deformations from fault
 
@@ -100,30 +100,58 @@ class Fault(object):
         @return Surface deformations at specificed coordinates
         '''
 
+        assert slip.shape == rake.shape, 'slip and rake must have same shape'
+        assert x_coords.shape == y_coords.shape, 'x_coords and y_coords must have same shape'
+
+        def compute_deformation(deformation, slip_ravel, rake_ravel, verbose=True):
+
+            if verbose:
+                my_range = trange(len(slip_ravel))
+            else:
+                my_range = range(len(slip_ravel))
+
+            for index in my_range:
+                x_center = self.cell_centroids[0,index]
+                y_center = self.cell_centroids[1,index]
+                depth = -self.cell_centroids[2,index]
+                slip_value = slip_ravel[index]
+                rake_value = rake_ravel[index]
+
+
+                deformation[:,:,:] = deformation + compute_okada_displacement(fault_centroid_x = x_center,
+                                                                              fault_centroid_y = y_center,
+                                                                              fault_centroid_depth = depth,
+                                                                              fault_strike = self.strike,
+                                                                              fault_dip = self.dip,
+                                                                              fault_length = self.cell_length,
+                                                                              fault_width = self.cell_width,
+                                                                              fault_rake = rake_value,
+                                                                              poisson_ratio = self.poisson_ratio,
+                                                                              fault_open = 0,
+                                                                              xx_array = x_coords,
+                                                                              yy_array = y_coords,
+                                                                              fault_slip = slip_value)
+
+
+
         deformation = np.zeros([3,*x_coords.shape], dtype=self._dtype)
-        slip_ravel = slip.ravel()
-        rake_ravel = rake.ravel()
 
-        for index in trange(len(slip_ravel)):
-            x_center = self.cell_centroids[0,index]
-            y_center = self.cell_centroids[1,index]
-            depth = -self.cell_centroids[2,index]
-            slip_value = slip_ravel[index]
-            rake_value = rake_ravel[index]
+        if slip.ndim == 3 and simple:
+            x_components = np.cos(rake) * slip
+            y_components = np.sin(rake) * slip
 
+            combined_x_components = np.sum(x_components, axis=0)
+            combined_y_components = np.sum(y_components, axis=0)
 
-            deformation += compute_okada_displacement(fault_centroid_x = x_center,
-                                                      fault_centroid_y = y_center,
-                                                      fault_centroid_depth = depth,
-                                                      fault_strike = self.strike,
-                                                      fault_dip = self.dip,
-                                                      fault_length = self.cell_length,
-                                                      fault_width = self.cell_width,
-                                                      fault_rake = rake_value,
-                                                      poisson_ratio = self.poisson_ratio,
-                                                      fault_open = 0,
-                                                      xx_array = x_coords,
-                                                      yy_array = y_coords,
-                                                      fault_slip = slip_value)
+            slip = np.sqrt(combined_x_components**2 + combined_y_components**2)
+            rake = np.arctan2(combined_y_components, combined_x_components)
+
+        if slip.ndim == 2:
+            compute_deformation(deformation, slip.ravel(), rake.ravel(), verbose=True)
+
+        elif slip.ndim == 3:
+            for i in trange(slip.shape[0]):
+                compute_deformation(deformation, slip[i,:,:].ravel(), rake[i,:,:].ravel(), verbose=False)
+
 
         return deformation
