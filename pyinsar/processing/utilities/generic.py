@@ -6,6 +6,7 @@ import re
 import cv2
 import numpy as np
 import pandas as pd
+import osr
 
 import warnings
 with warnings.catch_warnings():
@@ -17,6 +18,63 @@ from scipy.interpolate import interp1d
 # from geodesy import wgs84
 from sklearn.linear_model import RANSACRegressor
 
+
+def get_image_extents(geotransform, shape):
+
+    georaster_x_size = shape[1]
+    georaster_y_size = shape[0]
+    xmin = geotransform[0]
+    ymax = geotransform[3]
+    xmax = xmin + geotransform[1]*georaster_x_size + geotransform[2]*georaster_y_size
+    ymin = ymax + geotransform[4]*georaster_x_size + geotransform[5]*georaster_y_size
+
+    return (xmin, xmax, ymin, ymax)
+
+
+def proj4StringToDictionary(proj4_string):
+    '''
+    Convert a proj4 string into a dictionary
+
+    Statements with no value are given a value of None
+
+    @param proj4_string: Proj4 string
+    @return Dictionary containing proj4 parameters as a OrderedDict
+    '''
+    proj4_dict = OrderedDict(re.findall('\+([^ ]+)=([^ ]+)', proj4_string))
+    all_params = re.findall('\+([^ =]+)', proj4_string)
+
+    for param in all_params:
+        if param not in proj4_dict:
+            proj4_dict[param] = None
+
+    return proj4_dict
+
+
+# def getCartopyProjection(in_wkt):
+#     my_spatial = osr.SpatialReference()
+#     my_spatial.ImportFromWkt(in_wkt)
+
+#     proj4_string = my_spatial.ExportToProj4()
+
+#     proj4_params_dict = proj4StringToDictionary(proj4_string)
+
+#     if 'datum' in proj4_params_dict:
+#         datum = proj4_params_dict['datum']
+#         del proj4_params_dict['datum']
+
+#     else:
+#         datum = None
+
+#     if 'ellps' in proj4_params_dict:
+#         ellipse = proj4_params_dict['ellps']
+#         del proj4_params_dict['ellps']
+
+#     else:
+#         ellipse='WGS84'
+
+#     globe = ccrs.Globe(datum=datum, ellipse=ellipse)
+
+#     return ccrs.Projection(**proj4_params_dict, globe=globe)
 
 
 def sorted_alphanumeric(l):
