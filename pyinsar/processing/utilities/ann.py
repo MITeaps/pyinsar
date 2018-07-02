@@ -7,11 +7,11 @@ import tensorflow as tf
 import numpy as np
 
 
-def buildCNN(image_height, image_width, model_dir, rate=0.01):
+def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None):
 
     graph = tf.Graph()
 
-    with tf.Session(graph=graph) as session:
+    with tf.Session(graph=graph, config=config) as session:
         training = tf.placeholder_with_default(False, shape=(), name='Training')
 
         with tf.variable_scope('IO'):
@@ -93,7 +93,8 @@ def buildCNN(image_height, image_width, model_dir, rate=0.01):
 
 def train(image_data, image_labels, model_dir,
           batch_size, num_epochs,  max_batches=None,
-          status_line_rate = 50, target='', shuffle=True):
+          status_line_rate = 50, target='', shuffle=True,
+          config=None):
 
 
     num_batches = image_data.shape[0] // batch_size
@@ -113,7 +114,7 @@ def train(image_data, image_labels, model_dir,
     saver = op_dict['saver']
 
 
-    with tf.Session(graph=graph) as session:
+    with tf.Session(graph=graph, config=config) as session:
         saver.restore(session, model_checkpoint)
 
         for epoch in range(num_epochs):
@@ -139,7 +140,7 @@ def train(image_data, image_labels, model_dir,
 
             saver.save(session, model_filename, run_id)
 
-def classify(image_data, model_dir, batch_size=2000):
+def classify(image_data, model_dir, batch_size=2000, config=None):
 
     graph, op_dict, model_checkpoint = restoreGraph(model_dir)
 
@@ -147,7 +148,7 @@ def classify(image_data, model_dir, batch_size=2000):
     logits = op_dict['logits']
     saver = op_dict['saver']
 
-    with tf.Session(graph=graph) as session:
+    with tf.Session(graph=graph, config=config) as session:
         saver = tf.train.Saver()
         saver.restore(session, model_checkpoint)
 
