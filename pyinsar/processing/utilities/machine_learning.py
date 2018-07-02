@@ -152,9 +152,10 @@ def retrieve_data(index, index_dict, data_file, size):
 
 class DataRetriever(object):
 
-    def __init__(self, file_name_list, label_list, size, chunk_size = 1000):
+    def __init__(self, file_name_list, label_list, size, dtype=np.float32, chunk_size = 1000):
         self.label_list = label_list
         self.size = list(size)
+        self.dtype = dtype
         self.chunk_size = 1000
 
         self.data_file_dict = OrderedDict()
@@ -222,7 +223,7 @@ class DataRetriever(object):
 
         local_index = index - num_images_before_index[group_index]
 
-        final_data = np.zeros([len(index)] + self.size)
+        final_data = np.zeros([len(index)] + self.size, dtype=self.dtype)
 
         datasets = np.unique(group_index)
 
