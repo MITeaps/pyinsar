@@ -8,7 +8,15 @@ import numpy as np
 
 
 def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None):
+    """
+    Build a convolutional neural network
 
+    @param image_height: Height of image in pixels
+    @param image_width: Width of image in pixels
+    @param model_dir: Directory to save network too
+    @param rate: Learning rate
+    @param config: Config to pass to tf.Session
+    """
     graph = tf.Graph()
 
     with tf.Session(graph=graph, config=config) as session:
@@ -95,7 +103,20 @@ def train(image_data, image_labels, model_dir,
           batch_size, num_epochs,  max_batches=None,
           status_line_rate = 50, target='', shuffle=True,
           config=None):
+    """
+    Train neural network
 
+    @param image_data: Image data to train (shape [:,image_width, image_height])
+    @param image_labels: Corresponding labels
+    @param model_dir: Directory where network is stored
+    @param batch_size: Batch size
+    @param num_epochs: Number of epochs
+    @param max_batches: Max number of patches (Typically used for testing)
+    @param status_line_rate: Number of batches between outputting training information
+    @param target: Unused
+    @param shuffle: Whether or not to shuffle the training data
+    @param config: Config to pass to tf.Session
+    """
 
     num_batches = image_data.shape[0] // batch_size
 
@@ -141,6 +162,16 @@ def train(image_data, image_labels, model_dir,
             saver.save(session, model_filename, run_id)
 
 def classify(image_data, model_dir, batch_size=2000, config=None):
+    """
+    Classify data
+
+    @param image_data: Input data
+    @param model_dir: Directory where network is stored
+    @param batch_size: Batch size to use for classifying data
+    @param config: Config to pass on to tf.Session
+
+    @return Predicted labels for input data
+    """
 
     graph, op_dict, model_checkpoint = restoreGraph(model_dir)
 
@@ -166,16 +197,36 @@ def classify(image_data, model_dir, batch_size=2000, config=None):
 
 
 def length_after_valid_window(length, window, stride):
+    """
+    Length of dimension after convolving using the padding type 'valid' or using max pooling
+
+    @param length: Initial length
+    @param window: Size of convolution window
+    @param stride: Stride used
+    @return New size after using convolution with 'valid' padding type or from max pooling
+    """
     return np.ceil( (length - window + 1) / stride).astype('int')
 
-
 def shuffleTrainingData(data, labels):
+    """
+    Shuffles data
+
+    @param data: Input data
+    @param labels: Input labels
+    """
     index = np.arange(data.shape[0])
     np.random.shuffle(index)
 
     return data[index], labels[index]
 
 def restoreGraph(model_dir):
+    """
+    Restore a network
+
+    @param model_dir: Directory containing network
+    @return graph, operation dictionary, and checkpoint
+    """
+
     graph = tf.Graph()
 
     op_dict = OrderedDict()

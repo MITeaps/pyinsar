@@ -270,7 +270,25 @@ def old_generate_interferogram_from_deformation(track_angle,
 
 
 def change_in_range_to_phase(los_deformation, wavelength, k=2):
+    '''
+    Compute phase from change in range
+
+    @param los_deformation: Change in distance along line of site
+    @param wavelength: Wavelength of radar
+    @param k: Number of passes
+
+    @return phase due to change in
+    '''
     return -2. * np.pi * k * los_deformation / wavelength
 
 def phase_to_change_in_range(phase, wavelength, k=2):
+    '''
+    Compute change in range from phase
+
+    @param phase: Input phase
+    @param wavelength: Wavelength of radar
+    @param k: Number of passes
+
+    @return Change in range
+    '''
     return -phase * wavelength / (2 * np.pi * k)

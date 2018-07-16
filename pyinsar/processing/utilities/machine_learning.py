@@ -41,6 +41,15 @@ def divide_into_squares(image, size, stride):
 
 
 def generate_minimum_ground_range_limits(satellite_height, incidence_ranges, image_size):
+    """
+    Determine the limits of minimum ground ranges of a satellite pass
+
+    @param satellite height: Height of satellite
+    @param incidence_ranges: Range of valid incidence angles (shape of [:,2])
+    @param image_size: Length of image
+    @return range of possible minimum ground ranges
+    """
+
     minimum_ground_ranges = np.tan(incidence_ranges) * satellite_height
     minimum_ground_ranges[:,1] = minimum_ground_ranges[:,1] -  np.sqrt(2) * image_size
 
@@ -49,6 +58,19 @@ def generate_minimum_ground_range_limits(satellite_height, incidence_ranges, ima
 
 def generate_phase_samples_from_looks_and_ranges(deformation_list, xx, yy, satellite_height, track_angles, minimum_ground_ranges,
                                                  size = (100,100), dtype=np.float32):
+    """
+    Generates different possible phases from a list of deformations due to different track angles and groud ranges.
+
+    @param deformation list: List of deformations
+    @param xx: x coordinates
+    @param yy: y coordinates
+    @param satellite_height: Height of satellite
+    @param track_angles: Iterable of track angles
+    @param minimum_ground_ranges: Iterable of minimum ground ranges
+    @param size: Tuple giving the size of each deformation in deformation_list
+    @param dtype: Data type
+    @return array containing paramaters and and array containing phases
+    """
 
     radar_wavelength = c / 5.405000454334350e+09
 
@@ -71,6 +93,16 @@ def generate_phase_samples_from_looks_and_ranges(deformation_list, xx, yy, satel
     return params, phases
 
 def generate_phase_samples(deformation, satellite_height, radar_wavelength, cell_size, image_size, stride=20):
+    """
+    **In Development** Generate phase samples by tiling an array of deformations
+
+    @param deformation: Array containing deformation
+    @param satellite_height: Height of Satellite
+    @param radar_wavelength: Wavelength of radar
+    @param cell_size: Size of cell (length of one side of the cell)
+    @param image_size: Ignored?
+    @param stride: Distance between tiles
+    """
     x_bound_start, x_bound_end, y_bound_start, y_bound_end = determine_x_y_bounds(deformation, x_coords, y_coords,offset=0,
                                                                                   threshold_function=threshold_otsu)
 
@@ -107,52 +139,63 @@ def generate_phase_samples(deformation, satellite_height, radar_wavelength, cell
     params, phases = generate_phase_samples_from_deformation(sim_patches, cut_x_coords, cut_y_coords, satellite_height,
                                                              track_angles,min_ground_range_array)
 
-def generate_index(data_file, label):
-    key_list = [ re.search('.*data$', key_name).group() for key_name in data_file.keys()
-                 if re.search('.*data$', key_name) is not None]
-    key_list.sort()
+# def generate_index(data_file, label):
+#     key_list = [ re.search('.*data$', key_name).group() for key_name in data_file.keys()
+#                  if re.search('.*data$', key_name) is not None]
+#     key_list.sort()
 
-    num_images = np.zeros(len(key_list), dtype=np.int)
-    index_dict = OrderedDict()
+#     num_images = np.zeros(len(key_list), dtype=np.int)
+#     index_dict = OrderedDict()
 
-    for index, key in enumerate(key_list):
-        index_dict[index] = key
-        num_images[index] = data_file[key].shape[0]
+#     for index, key in enumerate(key_list):
+#         index_dict[index] = key
+#         num_images[index] = data_file[key].shape[0]
 
-    final_index = np.zeros((np.sum(num_images),3), dtype=int)
-    final_index[:,0] = label
+#     final_index = np.zeros((np.sum(num_images),3), dtype=int)
+#     final_index[:,0] = label
 
-    current_index = 0
-    for index in range(len(num_images)):
-        tmp_num_images = num_images[index]
-        index_slice = slice(current_index, tmp_num_images+current_index)
-        final_index[index_slice, 1] = index
-        final_index[index_slice, 2] = np.arange(tmp_num_images)
-        current_index += tmp_num_images
-
-
-    return index_dict, final_index
+#     current_index = 0
+#     for index in range(len(num_images)):
+#         tmp_num_images = num_images[index]
+#         index_slice = slice(current_index, tmp_num_images+current_index)
+#         final_index[index_slice, 1] = index
+#         final_index[index_slice, 2] = np.arange(tmp_num_images)
+#         current_index += tmp_num_images
 
 
+#     return index_dict, final_index
 
-def retrieve_data(index, index_dict, data_file, size):
-    final_data = np.zeros([index.shape[0]] + list(size))
 
-    datasets = np.unique(index[:,0])
 
-    for i in range(len(datasets)):
-        dataset_name = index_dict[datasets[i]]
+# def retrieve_data(index, index_dict, data_file, size):
+#     final_data = np.zeros([index.shape[0]] + list(size))
 
-        dataset_index = index[:,0] == datasets[i]
+#     datasets = np.unique(index[:,0])
 
-        final_data[dataset_index,:,:] = data_file[dataset_name][index[dataset_index,1],:,:]
+#     for i in range(len(datasets)):
+#         dataset_name = index_dict[datasets[i]]
 
-    return final_data
+#         dataset_index = index[:,0] == datasets[i]
+
+#         final_data[dataset_index,:,:] = data_file[dataset_name][index[dataset_index,1],:,:]
+
+#     return final_data
 
 
 class DataRetriever(object):
-
+    """
+    Class for retrieving data from an hdf file
+    """
     def __init__(self, file_name_list, label_list, size, dtype=np.float32, chunk_size = 1000):
+        """
+        Initilaize DataRetriever object
+
+        @param file_name_list: List of hdf filenames
+        @param label_list: List of labels
+        @param size: Tuple containing the size of the images
+        @param dtype: Data type of images
+        @param chunk_size: Size of chunks to use when reading data
+        """
         self.label_list = label_list
         self.size = list(size)
         self.dtype = dtype
@@ -182,6 +225,11 @@ class DataRetriever(object):
             self.data_file_dict[label]['num_images'] = current_index
 
     def get_num_images(self):
+        """
+        Get the number of images for each label
+
+        @return Number of images associated with each label
+        """
         num_images = np.zeros((len(self.label_list), 2), dtype=np.int)
 
         num_images[:,0] = self.label_list
@@ -193,7 +241,15 @@ class DataRetriever(object):
 
 
     def _retrieve_hdf_data(self, label, dataset_name, index):
+        """
+        Retrieve data from a given label
 
+        @param label: Label of data
+        @param dataset_name: Name of dataset
+        @param index: Index of data to retrieve
+
+        @return Requested images
+        """
         sorted_index = np.argsort(index)
 
         if self.chunk_size is None or self.chunk_size == 0:
@@ -213,9 +269,15 @@ class DataRetriever(object):
 
             return return_data
 
-
     def _get_images_from_label(self, label, index):
+        """
+        Get images from a particular label
 
+        @param label: Label of data to retrieve
+        @param index: Index of data to retrieve
+
+        @return Requested images
+        """
         group_index = np.searchsorted(self.data_file_dict[label]['image_index'], index, side='right')
 
         num_images_before_index = np.roll(self.data_file_dict[label]['image_index'], shift=1)
@@ -237,6 +299,12 @@ class DataRetriever(object):
         return final_data
 
     def get_images(self, index):
+        """
+        Retrieve images given by index
+
+        @param index: Array with shape [:,2], first column label, second column index
+        @return Requested images
+        """
         valid_labels = np.unique(index[:,0])
 
         image_data = np.zeros([index.shape[0]] + self.size)
@@ -250,6 +318,16 @@ class DataRetriever(object):
 
 
 def rotate_image_list(in_image_extents, in_image_list, progress=True):
+    """
+    Rotate input images 0, 90, 180, and 270 degrees
+
+    @param in_image_extents: List of the extents of the images being rotated
+    @param in_image_list: List of images to rotate
+    @param progress: Show a progress bar
+
+    @return array of image extents, and array of rotated images
+    """
+
 
     new_image_data = np.zeros([len(in_image_extents)*4, 100, 100], dtype=in_image_list[0].dtype)
     new_image_extents = np.zeros([len(in_image_extents)*4, 4], dtype=np.int)
@@ -266,7 +344,18 @@ def rotate_image_list(in_image_extents, in_image_list, progress=True):
 
 def project_insar_data(in_dataset, lon_center, lat_center, interpolation=gdal.GRA_Cubic,
                        no_data_value=np.nan, data_type=gdal.GDT_Float64):
+    """
+    Project InSAR data using GDAL
 
+    @param in_dataset: GDAL data set to be projected
+    @param lon_center: Longitude center of projecting
+    @param lat_center: Latitude center of projecting
+    @param interpolation: What kind of interpolation to use (GDAL Flags)
+    @param no_data_value: What value to use in the case of no data
+    @param data_type: Resulting data type (GDAL flag)
+
+    @return array containing projected data
+    """
 
     spatial = osr.SpatialReference()
     spatial.ImportFromProj4(f'+proj=tmerc +lat_0={lat_center} +lon_0={lon_center} +datum=WGS84 +ellps=WGS84 +k=0.9996 +no_defs')
