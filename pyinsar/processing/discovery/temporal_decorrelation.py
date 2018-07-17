@@ -45,7 +45,7 @@ class TemporalDecorrelation(PipelineItem):
     Pipeline item to add temporal decorrelation to some phase
     '''
 
-    def __init__(self, str_description, ap_paramList, grid_yx_spacing, wavelength, seed=None):
+    def __init__(self, str_description, ap_paramList, grid_yx_spacing, wavelength, seed=None, save_noise=False):
         '''
         Initialize Temporal Decorrelation pipeline item
 
@@ -66,6 +66,7 @@ class TemporalDecorrelation(PipelineItem):
 
         self._seed = seed
         self._wavelength = wavelength
+        self._save_noise = save_noise
 
         super(TemporalDecorrelation, self).__init__(str_description, ap_paramList)
 
@@ -80,6 +81,10 @@ class TemporalDecorrelation(PipelineItem):
 
         decorrelation_mean = self.ap_paramList[5]()
         decorrelation_std = self.ap_paramList[6]()
+
+
+        if self._save_noise:
+            my_noise = OrderedDict()
 
         for label, data in obj_data.getIterator():
 
@@ -111,6 +116,10 @@ class TemporalDecorrelation(PipelineItem):
 
             temporal_decorrelation = insar_simulator_utils.change_in_range_to_phase(temporal_decorrelation, wavelength = self._wavelength)
 
-
+            if self._save_noise:
+                my_noise[label] = temporal_decorrelation
 
             obj_data.updateData(label, data + temporal_decorrelation)
+
+        if self._save_noise:
+            obj_data.addResult(self.str_description, my_noise)
