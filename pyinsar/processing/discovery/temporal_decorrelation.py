@@ -110,9 +110,9 @@ class TemporalDecorrelation(PipelineItem):
 
             cumulative_frequency = compute_averaged_cumulative_distribution_from_array(raw_temporal_decorrelation[0])
 
-            temporal_decorrelation = sp.stats.expon.ppf(cumulative_frequency,
-                                                        loc = decorrelation_mean,
-                                                        scale = decorrelation_std)
+            temporal_decorrelation = sp.stats.laplace.ppf(cumulative_frequency,
+                                                       loc = decorrelation_mean,
+                                                       scale = decorrelation_std)
 
             temporal_decorrelation = insar_simulator_utils.change_in_range_to_phase(temporal_decorrelation, wavelength = self._wavelength)
 
