@@ -39,9 +39,8 @@ import numpy as np
 
 
 class LOS_Deformation(PipelineItem):
-    '''
+    """
     ap_paramList[
 
     def process(self, obj_data):
-
-        
+    """

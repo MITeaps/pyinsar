@@ -433,6 +433,14 @@ def update_geolocation_lines(tree, azimuth_times, geolocation_data):
 
 
 def get_sentinel_extents(geolocation, offset=0.0):
+    """
+    Get the extents (latitude and longitude) of a sentinel-1 image given its geolocation information
+
+    @param geolocation: Geolocation data read in by read_geolocation
+    @param offset: Extra offset to add to the extent
+
+    @return Latitude and longitude extents of a sentinel-1
+    """
     lat_min = np.min(geolocation['Latitudes']) - offset
     lon_min = np.min(geolocation['Longitudes']) - offset
     lat_max = np.max(geolocation['Latitudes']) + offset

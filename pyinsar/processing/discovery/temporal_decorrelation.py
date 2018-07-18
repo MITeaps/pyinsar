@@ -71,6 +71,11 @@ class TemporalDecorrelation(PipelineItem):
         super(TemporalDecorrelation, self).__init__(str_description, ap_paramList)
 
     def process(self, obj_data):
+        """
+        Add temporal decorrelation to a phase image
+
+        @obj_data: Image data wrapper
+        """
 
         vario_models = self.ap_paramList[0]()
         vario_sills = self.ap_paramList[1]()

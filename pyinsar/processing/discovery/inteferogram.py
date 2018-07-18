@@ -38,19 +38,28 @@ class Interferogram(PipelineItem):
     ''' Create Inteferogram from SLC data'''
 
     def __init__(self, str_description, pairing='neighbor'):
+        """
+        Initialize Interferogram item
+
+        @param str_description: String describing item
+        @param pairing: How to pair SLC images. Currently only 'neighbor' is accepted'
+        """
         self._pairing = pairing
 
         super(Interferogram, self).__init__(str_description)
 
     def process(self, obj_data):
+        """
+        Create interferograms from SLC images in an image wrapper
 
+        @param obj_data: Image wrapper containing SLC images
+        """
 
         data_dict = OrderedDict()
         metadata_dict = OrderedDict()
 
         if self._pairing == 'neighbor':
             data_iterator = pairwise(obj_data.getIterator())
-
 
 
         master_label = next(obj_data.getIterator())[0]
