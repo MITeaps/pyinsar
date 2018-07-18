@@ -4,16 +4,28 @@ from skdaccess.framework.data_class import DataFetcherBase, ImageWrapper
 from pyinsar.processing.deformation.elastic_halfspace.okada import compute_okada_displacement
 
 class DataFetcher(DataFetcherBase):
-    '''
+    """
     Generates data from an Okada model
-    '''
+    """
     def __init__(self, ap_paramList, xx_array, yy_array, verbose=False):
-        '''
-        Initialize DataFetcher
+        """
+        Initialize Okada DataFetcher
 
-        @param dictionary where the keys are filenames and the values are the dataset names
-        @param verbose: Output extra debug information
-        '''
+        @ap_paramList[fault_centroid_x]: x centroid
+        @ap_paramList[fault_centroid_y]: y centroid
+        @ap_paramList[fault_centroid_depth]: Fault depth
+        @ap_paramList[fault_strike]: Fault strike
+        @ap_paramList[fault_dip]: Fault dip
+        @ap_paramList[fault_length]: Fault Length
+        @ap_paramList[fault_width]: Fault width
+        @ap_paramList[fault_rake]: Fault rake
+        @ap_paramList[fault_slip]: Fault slip
+        @ap_paramList[fault_open]: Fault open
+        @ap_paramList[poisson_ratio]: Poisson ratio
+        @xx_array: Array of x coordinates
+        @yy_array: Array of y coordinates
+        @verbose: Print out extra information
+        """
         self._xx_array = xx_array
         self._yy_array = yy_array
 
@@ -21,6 +33,11 @@ class DataFetcher(DataFetcherBase):
 
 
     def output(self):
+        """
+        Output deformation in an image wrapper
+
+        @return Deformation in an Image wrapper 
+        """
 
         metadata_dict = OrderedDict()
         data_dict = OrderedDict()
