@@ -3,8 +3,8 @@
 #
 # Authors: Cody Rude
 # This software is part of the NSF DIBBS Project "An Infrastructure for
-# Computer Aided Discovery in Geoscience" (PI: V. Pankratius) and 
-# NASA AIST Project "Computer-Aided Discovery of Earth Surface 
+# Computer Aided Discovery in Geoscience" (PI: V. Pankratius) and
+# NASA AIST Project "Computer-Aided Discovery of Earth Surface
 # Deformation Phenomena" (PI: V. Pankratius)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -13,7 +13,7 @@
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in
 # all copies or substantial portions of the Software.
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -46,7 +46,7 @@ class Coherence(PipelineItem):
 
         @param str_description: Short string describing item
         @param window: Tuple indicating the y and x window size
-        @param pairing: How to pair slc images. "neighbor" computes 
+        @param pairing: How to pair slc images. "neighbor" computes
                         coherence between neighboring images
         '''
 
@@ -54,19 +54,19 @@ class Coherence(PipelineItem):
         self.pairing = pairing
         self.use_progress_bar = use_progress_bar
 
-        
+
         super(Coherence, self).__init__(str_description,[])
 
 
     def process(self, obj_data):
-        ''' 
-        Compute the coherency between two 
-        
+        '''
+        Compute the coherency between two
+
         @param obj_data: Data wrapper
         '''
 
         results_dict = OrderedDict()
-        
+
         if self.pairing == 'neighbor':
             first_image_it = obj_data.getIterator()
             second_image_it = obj_data.getIterator()
