@@ -431,3 +431,14 @@ class AffineGlobalCoords(object):
         x = -(c5 * (c0 - x_proj) + c2*y_proj - c2*c3) / (c1*c5 - c2*c4)
 
         return y - self._y_offset, x - self._x_offset
+
+
+def subarray_slice(index, num_items):
+    """
+    Returns a slice that selects for selecting a chunk out of an array
+
+    @param index: Which chunk to select
+    @param num_items: Number of items in a chunk
+    @return A slice for selecting index*num_items to (index+1)*num_items
+    """
+    return slice(index * num_items, (index+1) * num_items)
