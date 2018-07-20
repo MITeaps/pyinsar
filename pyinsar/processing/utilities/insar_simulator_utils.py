@@ -102,10 +102,10 @@ def retrieve_bounds(thresh_image):
     column_maximums = np.max(thresh_image, axis=0)
     row_maximums = np.max(thresh_image, axis=1)
     x_start = np.argmax(column_maximums)
-    x_end = len(column_maximums) - np.argmax(column_maximums[::-1]) - 1
+    x_end = len(column_maximums) - np.argmax(column_maximums[::-1])
 
     y_start = np.argmax(row_maximums)
-    y_end = len(row_maximums) - np.argmax(row_maximums[::-1]) - 1
+    y_end = len(row_maximums) - np.argmax(row_maximums[::-1])
 
     return x_start, x_end, y_start, y_end
 
