@@ -88,6 +88,17 @@ def calc_bounding_box(image, threshold_function = threshold_li):
     '''
     thresh = threshold_function(image)
     thresh_image = np.where(image < thresh, 0, 1)
+
+    return retrieve_bounds(thresh_image)
+
+
+def retrieve_bounds(thresh_image):
+    """
+    Retrieve the bounds of an image that has been thesholded
+
+    @param thresh_image: Image filled with ones for valid and zeros for invalid
+    @return: Extents of a rectangle around valid data (x_start, x_end, y_start, y_end)
+    """
     column_maximums = np.max(thresh_image, axis=0)
     row_maximums = np.max(thresh_image, axis=1)
     x_start = np.argmax(column_maximums)
@@ -97,6 +108,20 @@ def calc_bounding_box(image, threshold_function = threshold_li):
     y_end = len(row_maximums) - np.argmax(row_maximums[::-1]) - 1
 
     return x_start, x_end, y_start, y_end
+
+
+def crop_nans(image):
+    """
+    Shrink image by removing nans
+
+    @param input image:
+    @return: Image cropped around valid data
+    """
+    thresh_image = ~np.isnan(image)
+
+    x_start, x_end, y_start, y_end = retrieve_bounds(thresh_image)
+
+    return image[y_start:y_end, x_start:x_end]
 
 
 def determine_deformation_bounding_box(deformations, largest_box=True, **kwargs):
