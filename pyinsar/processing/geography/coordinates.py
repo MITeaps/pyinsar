@@ -275,8 +275,10 @@ def reproject_point(lon,
                     lat,
                     old_projection_EPSG = None,
                     old_projection_wkt = None,
+                    old_projection_utm = None,
                     new_projection_EPSG = None,
-                    new_projection_wkt = None):
+                    new_projection_wkt = None,
+                    new_projection_utm = None):
     '''
     Reproject a single point
     
@@ -285,29 +287,38 @@ def reproject_point(lon,
     @param old_projection_EPSG: EPSG code of the old projection
     @param old_projection_wkt: WKT code of the old projection (can be used instead
                                of the old_projection_EPSG)
+    @param old_projection_utm: Tuple with the UTM zone code and if it's northern or not
     @param new_projection_EPSG: EPSG code of the new projection
     @param new_projection_wkt: WKT code of the new projection (can be used instead
                                of the new_projection_EPSG)
+    @param new_projection_utm: Tuple with the UTM zone code and if it's northern or not
     
     @return The coordinates' arrays
     '''
     assert (old_projection_EPSG is not None
-            or old_projection_wkt is not None), 'No old projection provided'
+            or old_projection_wkt is not None
+            or old_projection_utm is not None), 'No old projection provided'
     assert (new_projection_EPSG is not None
-            or new_projection_wkt is not None), 'No new projection provided'
-
+            or new_projection_wkt is not None
+            or new_projection_utm is not None), 'No new projection provided'
 
     old_spatial_reference = osr.SpatialReference()
     if old_projection_EPSG is not None:
         old_spatial_reference.ImportFromEPSG(old_projection_EPSG)
     elif old_projection_wkt is not None:
         old_spatial_reference.ImportFromWkt(old_projection_wkt)
+    elif new_projection_utm is not None:
+        assert len(new_projection_utm) == 2, 'UTM projection requires a zone code and an hemisphere code'
+        old_spatial_reference.SetUTM(old_projection_utm[0], old_projection_utm[1])
     
     new_spatial_reference = osr.SpatialReference()
     if new_projection_EPSG is not None:
         new_spatial_reference.ImportFromEPSG(new_projection_EPSG)
     elif new_projection_wkt is not None:
         new_spatial_reference.ImportFromWkt(new_projection_wkt)
+    elif new_projection_utm is not None:
+        assert len(new_projection_utm) == 2, 'UTM projection requires a zone code and an hemisphere code'
+        new_spatial_reference.SetUTM(new_projection_utm[0], new_projection_utm[1])
 
     transform = osr.CoordinateTransformation(old_spatial_reference,
                                              new_spatial_reference)
@@ -343,7 +354,8 @@ def reproject_georaster(georaster,
                         data_type = gdal.GDT_Float64,
                         no_data_value = -99999.,
                         scale = 1.,
-                        offset = 0.):
+                        offset = 0.,
+                        options = []):
     '''
     Change the projection of a GDAL georaster
     
@@ -353,7 +365,8 @@ def reproject_georaster(georaster,
     @param new_projection_wkt: WKT code of the new projection (can be used instead
                                of the new_projection_EPSG)
     @param new_projection_utm: Tuple with the UTM zone code and if it's northern or not
-    @param new_extent: Tuple with the minimal x, maximal x, minimal y, maximal y for the new georaster
+    @param new_extent: Tuple with the minimal x, maximal x, minimal y, maximal y
+                       for the new georaster
     @param interpolation_method: Interpolation method used during the projection
     @param file_type: Type to save the file (default is memory)
     @param file_path: Where to store the new georasterEPSG_code (default is memory)
@@ -361,6 +374,7 @@ def reproject_georaster(georaster,
     @param no_data_value: No data value for the georaster
     @param scale: Scaling factor for the georaster
     @param offset: Offset factor for the georaster
+    @param options: List of options for compression
     
     @return The GDAL georaster
     '''
@@ -418,7 +432,8 @@ def reproject_georaster(georaster,
                                   new_x_size,
                                   new_y_size,
                                   number_of_bands,
-                                  data_type)
+                                  data_type,
+                                  options = options)
     new_georaster.SetGeoTransform(new_geotransform)
     new_georaster.SetProjection(new_spatial_reference.ExportToWkt())
     for i_band in range(1, number_of_bands + 1):
