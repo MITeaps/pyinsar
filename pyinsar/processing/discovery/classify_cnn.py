@@ -32,6 +32,8 @@ from pyinsar.processing.utilities import ann
 
 # Scikit Discovery imports
 from skdiscovery.data_structure.framework.base import PipelineItem
+from skdiscovery.utilities.patterns.image_tools import divideIntoSquares
+
 
 
 # 3rd party imports
@@ -41,18 +43,28 @@ import numpy as np
 class ClassifyCNN(PipelineItem):
     """ Train a CNN """
 
-    def __init__(self, str_description, cnn_network_dir, batch_size=2000, config=None, compare_labels=False):
+    def __init__(self, str_description, cnn_network_dir, batch_size=2000, config=None, compare_labels=False,
+                 stride = None, size=None):
         """
         Initialize TrainCNN item
 
         @param str_description: String describing item
         @param cnn_network_dir: Strining containing the directiory where the CNN is stored
+        @param batch_size: Batch size to use when classifying with Tensorflow
+        @param config: Additional session configuration dictionary
+        @param compare_labels: Compare measured labels with labels stored in metadata
         """
+        assert stride is None and size is None or \
+               stride is not None and size is not None, \
+               'Either both or neither stride and size should be None'
 
         self.cnn_network_dir = cnn_network_dir
         self.batch_size = batch_size
         self.config = config
         self.compare_labels = compare_labels
+        self.stride = stride
+        self.size = size
+
         super(ClassifyCNN, self).__init__(str_description, [])
 
     def process(self, obj_data):
@@ -73,18 +85,24 @@ class ClassifyCNN(PipelineItem):
         else:
             raise RuntimeError("Images must have two or thee dimensions")
 
-
-
         combined_data = my_combine_function([data for label, data in obj_data.getIterator()])
 
 
-        labels = ann.classify(image_data = combined_data, self.cnn_network_dir, self.batch_size, self.config)
+        if self.stride is not None:
+            extents, combined_data = divideIntoSquares(combined_data, self.size, self.stride)
+
+        else:
+            extents = np.array([[0, data.shape[-2], 0, data.shape[-1]]])
+
+
+        labels = ann.classify(image_data = combined_data,
+                              model_dir = self.cnn_network_dir,
+                              batch_size = self.batch_size,
+                              config = self.config)
 
         results = OrderedDict()
         results['labels'] = labels
-
-
-
+        results['extents']  = extents
 
         if self.compare_labels:
 
@@ -97,4 +115,4 @@ class ClassifyCNN(PipelineItem):
 
 
 
-        obj_data.addResult(self.str_description, labels)
+        obj_data.addResult(self.str_description, results)
