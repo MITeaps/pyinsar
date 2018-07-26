@@ -1,12 +1,19 @@
 # Standard library imports
 from collections import OrderedDict
+from urllib.parse import urlencode
+import json
 import re
 
 # 3rd party imports
+from six.moves.urllib.request import urlopen
 import cv2
 import numpy as np
 import pandas as pd
 import osr
+import shapely as shp
+import shapely.geometry
+import shapely.wkt
+
 
 import warnings
 with warnings.catch_warnings():
@@ -80,14 +87,14 @@ def proj4StringToDictionary(proj4_string):
 def sorted_alphanumeric(l):
     '''
     Sort a list of strings with numbers
- 
+
     @param l: The list
- 
+
     @return The sorted list
     '''
     convert = lambda text: int(text) if text.isdigit() else text
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
-    
+
     return sorted(l, key = alphanum_key)
 
 def phase_shift(data, phase):
@@ -442,3 +449,77 @@ def subarray_slice(index, num_items):
     @return A slice for selecting index*num_items to (index+1)*num_items
     """
     return slice(index * num_items, (index+1) * num_items)
+
+
+def find_data_asf(lat, lon, processingLevel='SLC', platform='Sentinel-1A,Sentinel-1B',
+                  **kwargs):
+    """
+    Search Alaska Satellite Facility for data
+
+    @param lat: Latitude
+    @param lon: Longitude
+    @param processingLevel: Processing level of data
+    @param platform: Instrument to search
+    @param kwargs: All additional kwargs will be used to search ASF
+                   See https://www.asf.alaska.edu/get-data/learn-by-doing/
+    @returns: List of available data matching the search criteria
+    """
+    baseurl = 'https://api.daac.asf.alaska.edu/services/search/param?'
+
+    if 'intersectsWith' in kwargs:
+        raise RuntimeWarning('Ignoring lat/lon as intersectsWith keyword was supplied')
+
+    else:
+        point = shp.geometry.Point(lon, lat)
+        kwargs['intersectsWith'] = point.to_wkt()
+
+    if 'output' in kwargs:
+        raise RuntimeWarning("Keyword 'output' ignored")
+
+
+    kwargs['output'] = 'json'
+    kwargs['processingLevel'] = 'SLC'
+    kwargs['platform'] = platform
+
+    search = urlencode(kwargs)
+    search_url = baseurl+search
+
+    with urlopen(baseurl+search) as urldata:
+        data = json.load(urldata)
+
+    return data[0]
+
+
+def select_max_orbits(sentinel_data_list):
+    """
+    Select the data that shares the same orbit.
+
+    The orbit that occurs is the chosen orbit
+
+    @param sentinel_data_list:
+    @returns:
+    """
+
+    def add_orbit(orbit):
+        if orbit not in max_orbits:
+            max_orbits[orbit] = 1
+        else:
+            max_orbits[orbit] += 1
+
+    max_orbits = OrderedDict()
+    for data in sentinel_data_list:
+        add_orbit(data['relativeOrbit'])
+
+    max_orbit = None
+    max_count = -1
+    for orbit, count in max_orbits.items():
+        if max_count < count:
+            max_count = count
+            max_orbit = orbit
+
+    final_data_list = []
+    for data in sentinel_data_list:
+        if data['relativeOrbit'] == max_orbit:
+            final_data_list.append(data)
+
+    return final_data_list
