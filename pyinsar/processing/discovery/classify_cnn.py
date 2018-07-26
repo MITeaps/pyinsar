@@ -73,44 +73,36 @@ class ClassifyCNN(PipelineItem):
 
         @param obj_data: Image wrapper
         """
-
-        label, data = next(obj_data.getIterator())
-
-        if data.ndim == 2:
-            my_combine_function = np.stack
-
-        elif data.ndim == 3:
-            my_combine_function = np.concatenate
-
-        else:
-            raise RuntimeError("Images must have two or thee dimensions")
-
-        combined_data = my_combine_function([data for label, data in obj_data.getIterator()])
-
-
-        if self.stride is not None:
-            extents, combined_data = divideIntoSquares(combined_data, self.size, self.stride)
-
-        else:
-            extents = np.array([[0, data.shape[-2], 0, data.shape[-1]]])
-
-
-        labels = ann.classify(image_data = combined_data,
-                              model_dir = self.cnn_network_dir,
-                              batch_size = self.batch_size,
-                              config = self.config)
-
         results = OrderedDict()
-        results['labels'] = labels
-        results['extents']  = extents
+        for label, data in obj_data.getIterator():
+            results[label] = OrderedDict()
 
-        if self.compare_labels:
+            if self.stride is not None:
+                extents, processed_data = divideIntoSquares(data, self.size, self.stride)
 
-            given_labels = np.concatenate([info['Labels'] for info in obj_data.info()])
-            
-            fraction_correct = np.count_nonzero(given_labels == labels) / len(labels)
+                print(processed_data.shape)
 
-            results['fraction_correct'] = fraction_correct
+            else:
+                processed_data = data
+                extents = np.array([[0, data.shape[-2], 0, data.shape[-1]]])
+
+
+            labels = ann.classify(image_data = processed_data,
+                                  model_dir = self.cnn_network_dir,
+                                  batch_size = self.batch_size,
+                                  config = self.config)
+
+
+            results[label]['labels'] = labels
+            results[label]['extents']  = extents
+
+            if self.compare_labels:
+
+                given_labels = info['Labels']
+
+                fraction_correct = np.count_nonzero(given_labels == labels) / len(labels)
+
+                results[label]['fraction_correct'] = fraction_correct
 
 
 
