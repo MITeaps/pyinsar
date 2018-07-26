@@ -24,9 +24,20 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+# Standard library imports
+from collections import OrderedDict
+
+# Pyinsar imports
+from pyinsar.processing.utilities.generic import proj4StringToDictionary
+
+# 3rd party imports
+from osgeo import gdal, osr
+from skdaccess.framework.data_class import DataFetcherBase, ImageWrapper
+
+
 class GDAL_DataFetcher(DataFetcherBase):
     """
-    Data fetcher for loading interferograms produced compatiable with GDAL
+    Data fetcher for loading Images produced compatiable with GDAL
     """
 
     def __init__(self, filename_list, label_list, verbose=False):
@@ -40,7 +51,7 @@ class GDAL_DataFetcher(DataFetcherBase):
         self._filename_list = filename_list
         self._label_list = label_list
 
-        super(ISCE_DataFetcher, self).__init__([], verbose)
+        super(GDAL_DataFetcher, self).__init__([], verbose)
 
 
     def output(self):
@@ -61,5 +72,10 @@ class GDAL_DataFetcher(DataFetcherBase):
             meta_dict[label] = OrderedDict()
             meta_dict[label]['WKT'] = ds.GetProjection()
             meta_dict[label]['GeoTransform'] = ds.GetGeoTransform()
+
+            spatial = osr.SpatialReference()
+
+            spatial.ImportFromWkt(meta_dict[label]['WKT'])
+            meta_dict[label]['proj4params'] = proj4StringToDictionary(spatial.ExportToProj4())
 
         return ImageWrapper(data_dict, meta_data = meta_dict)
