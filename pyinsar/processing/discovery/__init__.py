@@ -5,3 +5,5 @@ from .inteferogram import Interferogram
 from .wrap_phase import WrapPhase
 from .train_cnn import TrainCNN
 from .classify_cnn import ClassifyCNN
+from .deburst import Deburst
+from .coregister import Coregister
