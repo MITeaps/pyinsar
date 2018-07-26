@@ -29,6 +29,7 @@ from collections import OrderedDict
 
 # Pyinsar imports
 from pyinsar.processing.utilities.generic import proj4StringToDictionary
+from pyinsar.data_import import import_georaster
 
 # 3rd party imports
 from osgeo import gdal, osr
