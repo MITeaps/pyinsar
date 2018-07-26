@@ -195,7 +195,7 @@ class SentinelRamp(object):
 
         @param lines: Index of lines
         @param samples: Index of samples
-        @param index: Burst index
+        @param index: Burst index (starts at 0)
 
         @return Phase due to ramp and modulation
         '''
