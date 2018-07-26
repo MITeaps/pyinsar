@@ -8,7 +8,7 @@ def calc_bounding_box(image):
     @param image: Input image
     @return Extent of deformation in image (x_start, x_end, y_start, y_end)
     """
-    
+
     thresh = threshold_li(image)
     thresh_image = np.where(image < thresh, 0, 1)
     column_maximums = np.max(thresh_image, axis=0)
@@ -18,7 +18,7 @@ def calc_bounding_box(image):
 
     y_start = np.argmax(row_maximums)
     y_end = len(row_maximums) - np.argmax(row_maximums[::-1]) - 1
-    
+
     return (x_start, x_end, y_start,  y_end)
 
 
@@ -47,6 +47,5 @@ def determine_x_y_bounds(deformations, x_array, y_array, offset=5000):
     bounding_box = determine_deformation_bounding_box(deformations)
     x_start, x_end = x_array[0, bounding_box[:2]]
     y_start, y_end = y_array[bounding_box[2:], 0]
-    
+
     return x_start-offset, x_end+offset, y_start-offset, y_end+offset
-    
