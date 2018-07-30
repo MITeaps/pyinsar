@@ -490,36 +490,119 @@ def find_data_asf(lat, lon, processingLevel='SLC', platform='Sentinel-1A,Sentine
     return data[0]
 
 
-def select_max_orbits(sentinel_data_list):
+def _get_key(data):
     """
-    Select the data that shares the same orbit.
+    Retrieve the key for a particular image
 
-    The orbit that occurs is the chosen orbit
+    @param data: Dictionary of information from the Alaska Satellite Facility
+    @return Dictionary key for data
+    """
+    return data['track'], data['frameNumber']
+
+
+
+def select_max_matched_data(sentinel_data_list):
+    """
+    Select the data that can be combined into an interferogram
+
+    The particular frame and track that maximizes the number
+    of useable data is chosen
 
     @param sentinel_data_list:
     @returns:
     """
 
-    def add_orbit(orbit):
-        if orbit not in max_orbits:
-            max_orbits[orbit] = 1
-        else:
-            max_orbits[orbit] += 1
+    def add_to_key(key):
+        """
+        Count the number of overlapping images
 
-    max_orbits = OrderedDict()
+        @param key: Key to use to identify image location
+        """
+
+        if key not in max_keys:
+            max_keys[key] = 1
+        else:
+            max_keys[key] += 1
+
+    max_keys = OrderedDict()
     for data in sentinel_data_list:
-        add_orbit(data['relativeOrbit'])
+        add_to_key(_get_key(data))
 
     max_orbit = None
     max_count = -1
-    for orbit, count in max_orbits.items():
+    for orbit, count in max_keys.items():
         if max_count < count:
             max_count = count
             max_orbit = orbit
 
     final_data_list = []
     for data in sentinel_data_list:
-        if data['relativeOrbit'] == max_orbit:
+        if _get_key(data) == max_orbit:
             final_data_list.append(data)
 
     return final_data_list
+
+
+def match_data(sentinel_data_list):
+    """
+    Seperate into sets of overlapping data
+
+    Seperates based on relative orbit, track, and frame
+
+    @param sentinel_data_list: List of information for different images
+    @return: Dictionary of lists of overlapping data
+    """
+
+    def add_info(data, data_dict):
+        """
+        Add information about image to a dictionary
+
+        @param data: Input data about an image
+        @param data_dict: Dictionary to store data
+        """
+        key = _get_key(data)
+        if key not in data_dict:
+            data_dict[key] = []
+
+        data_dict[key].append(data)
+
+    organized_data_dict = OrderedDict()
+    for data in sentinel_data_list:
+        add_info(data, organized_data_dict)
+
+    return organized_data_dict
+
+
+
+def find_earthquake_pairs(organized_data, date):
+    """
+    Select image pairs around a specified date
+
+    @param organized_data: Dictionary of information about data that
+                           has been organized into overlapping images
+
+    @param date: Date of the event of interest
+    @return Dictionary containing lists of pairs of images around the specified event
+    """
+
+    if isinstance(date, str):
+        date = pd.to_datetime(date)
+
+    return_data_dict = OrderedDict()
+    remove_list = []
+    for label, data in organized_data.items():
+        if len(data) > 1:
+            date_array = np.array([pd.to_datetime(info['sceneDate']) for info in data])
+            sorted_index = np.argsort(date_array)
+            date_array = date_array[sorted_index]
+
+            date_index = np.searchsorted(date_array, date)
+            if date_index != 0 and date_index != len(date_array):
+                first_image_index = sorted_index[date_index-1]
+                second_image_index = sorted_index[date_index]
+
+                return_data_dict[label] = []
+                return_data_dict[label].append(data[first_image_index])
+                return_data_dict[label].append(data[second_image_index])
+
+    return return_data_dict
