@@ -606,3 +606,18 @@ def find_earthquake_pairs(organized_data, date):
                 return_data_dict[label].append(data[second_image_index])
 
     return return_data_dict
+
+
+def generateMatplotlibRectangle(extent, **kwargs):
+    """
+    Generate a matplotlib rectangle from a extents
+
+    @param extent: Container holding the extent (x_min, x_max, y_min, y_max)
+
+    @return Matplotlib rectangle
+    """
+    xy = [extent[0], extent[2]]
+    width = extent[1] - extent[0]
+    height = extent[3] - extent[2]
+
+    return mpl.patches.Rectangle(xy, width, height, **kwargs)
