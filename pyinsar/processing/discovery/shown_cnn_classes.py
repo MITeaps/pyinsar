@@ -61,8 +61,8 @@ class ShowCNNClasses(PipelineItem):
         """
         for label, data in obj_data.getIterator():
 
-            extents = obj_data.info(label)[self.class_name)['extents']
-            labels = obj_data.info(label)[self.class_name)['labels']
+            extents = obj_data.info(label)[self.class_name]['extents']
+            labels = obj_data.info(label)[self.class_name]['labels']
 
             ax = plt.axes()
 
