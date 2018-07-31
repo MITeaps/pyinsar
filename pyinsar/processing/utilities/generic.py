@@ -290,6 +290,16 @@ def scale_image(input_data, vmin=None, vmax=None):
 
 
 def keypoints_align(img1, img2, max_matches=40, invert=True):
+    """
+    *** In Development *** Determine transformation matrix for aligning images
+
+    @param img1: First image
+    @param img2: Second image
+    @max_maches: Maximum number of matches between the two images
+    @param invert: Invert the transformation matrix
+
+    @return: Transformation matrix that connects two images
+    """
 
     def buildMatchedPoints(in_matches, query_kp, train_kp):
         query_index = [match.queryIdx for match in in_matches]
