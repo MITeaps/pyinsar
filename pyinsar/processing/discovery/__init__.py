@@ -8,3 +8,4 @@ from .classify_cnn import ClassifyCNN
 from .deburst import Deburst
 from .coregister import Coregister
 from .shown_cnn_classes import ShowCNNClasses
+from .flat_earth import FlatEarth
