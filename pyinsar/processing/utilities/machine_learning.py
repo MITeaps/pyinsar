@@ -341,28 +341,3 @@ def rotate_image_list(in_image_extents, in_image_list, progress=True):
     return new_image_extents, new_image_data
 
 
-
-def project_insar_data(in_dataset, lon_center, lat_center, interpolation=gdal.GRA_Cubic,
-                       no_data_value=np.nan, data_type=gdal.GDT_Float64):
-    """
-    Project InSAR data using GDAL
-
-    @param in_dataset: GDAL data set to be projected
-    @param lon_center: Longitude center of projecting
-    @param lat_center: Latitude center of projecting
-    @param interpolation: What kind of interpolation to use (GDAL Flags)
-    @param no_data_value: What value to use in the case of no data
-    @param data_type: Resulting data type (GDAL flag)
-
-    @return array containing projected data
-    """
-
-    spatial = osr.SpatialReference()
-    spatial.ImportFromProj4(f'+proj=tmerc +lat_0={lat_center} +lon_0={lon_center} +datum=WGS84 +ellps=WGS84 +k=0.9996 +no_defs')
-    reprojected_dataset = reproject_georaster(georaster=in_dataset,
-                                              interpolation_method=interpolation,
-                                              new_cell_sizes=[100,100],
-                                              new_projection_wkt=spatial.ExportToWkt(),
-                                              no_data_value=no_data_value,
-                                              data_type=data_type)
-    return reprojected_dataset.ReadAsArray()
