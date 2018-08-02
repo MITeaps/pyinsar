@@ -27,7 +27,12 @@ from sklearn.linear_model import RANSACRegressor
 
 
 def get_image_extents(geotransform, shape):
+    """
+    Get extents of in projection coordinates
 
+    @param geotransform: Geo transform for converting between pixel and projected coordinates
+    @param shape: Shape of image
+    """
     georaster_x_size = shape[1]
     georaster_y_size = shape[0]
     xmin = geotransform[0]
