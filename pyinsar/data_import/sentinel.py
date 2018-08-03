@@ -37,9 +37,9 @@ from pyinsar.data_import.import_utils import *
 
 def parse_satellite_data(in_satellite_file):
     '''
-    Parse Sentinel satelllite data
+    Parse Sentinel satellite data
 
-    @param in_sentinel_file: Satellite orbit filename
+    @param in_satellite_file: Satellite orbit filename
 
     @return DataFrame of orbit information
     '''

@@ -47,6 +47,8 @@ class TrainCNN(PipelineItem):
 
         @param str_description: String describing item
         @param cnn_network_dir: Strining containing the directiory where the CNN is stored
+        @param batch_size: Batch size to use when training data
+        @param config: Dictinoary of extra options to use with the tensorflow session
         """
 
         self.cnn_network_dir = cnn_network_dir

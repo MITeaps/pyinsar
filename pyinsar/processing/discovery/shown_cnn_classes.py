@@ -45,8 +45,9 @@ class ShowCNNClasses(PipelineItem):
         """
         Initialize ShowCNNClassesItem
 
-        @str_description: String name of item
+        @param str_description: String name of item
         @param class_name: Name of classes
+        @param colors: List of colors containing a color for each class
         """
         self.class_name = class_name
         self.colors = colors

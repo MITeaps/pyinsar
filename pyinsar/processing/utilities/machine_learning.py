@@ -44,7 +44,7 @@ def generate_minimum_ground_range_limits(satellite_height, incidence_ranges, ima
     """
     Determine the limits of minimum ground ranges of a satellite pass
 
-    @param satellite height: Height of satellite
+    @param satellite_height: Height of satellite
     @param incidence_ranges: Range of valid incidence angles (shape of [:,2])
     @param image_size: Length of image
     @return range of possible minimum ground ranges
@@ -61,7 +61,7 @@ def generate_phase_samples_from_looks_and_ranges(deformation_list, xx, yy, satel
     """
     Generates different possible phases from a list of deformations due to different track angles and groud ranges.
 
-    @param deformation list: List of deformations
+    @param deformation_list: List of deformations
     @param xx: x coordinates
     @param yy: y coordinates
     @param satellite_height: Height of satellite

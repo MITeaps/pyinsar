@@ -1,3 +1,30 @@
+# The MIT License (MIT)
+# Copyright (c) 2018 Massachusetts Institute of Technology
+#
+# Authors: Cody Rude
+# This software is part of the NSF DIBBS Project "An Infrastructure for
+# Computer Aided Discovery in Geoscience" (PI: V. Pankratius) and
+# NASA AIST Project "Computer-Aided Discovery of Earth Surface
+# Deformation Phenomena" (PI: V. Pankratius)
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+
 # Standard library imports
 from collections import OrderedDict
 from urllib.parse import urlencode
@@ -134,6 +161,7 @@ def rotate(col_vectors, az, ay, ax, dtype=np.float64):
     @param az: Angle for rotation about the z axis
     @param ay: Angle for rotation about the y axis
     @param ax: Angle for rotation about the x axis
+    @param dtype: Data type to use
 
     @param return Rotated vectors
     '''
@@ -300,7 +328,7 @@ def keypoints_align(img1, img2, max_matches=40, invert=True):
 
     @param img1: First image
     @param img2: Second image
-    @max_maches: Maximum number of matches between the two images
+    @param max_matches: Maximum number of matches between the two images
     @param invert: Invert the transformation matrix
 
     @return: Transformation matrix that connects two images
@@ -570,6 +598,7 @@ def generateMatplotlibRectangle(extent, **kwargs):
     Generate a matplotlib rectangle from a extents
 
     @param extent: Container holding the extent (x_min, x_max, y_min, y_max)
+    @param kwargs: Extra keyword arguments passed to matplotlib.patches.Rectangle
 
     @return Matplotlib rectangle
     """

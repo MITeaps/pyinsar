@@ -36,18 +36,39 @@ from pyinsar.processing.utilities.generic import keypoints_align, scale_image
 
 
 # 3rd party imports
-import cv2
 import imreg_dft as ird
 import numpy as np
 
 class Coregister(PipelineItem):
+    """
+    *** In Devolopment *** Pipeline item to coregister images
+    """
 
     def __init__(self, str_description, ap_paramList, image_limits = None, num_iterations=3):
+        """
+        Initialize Coregister pipeline item
+
+        @param str_description: String describing item
+        @param ap_paramList[reg_type]: Registration method (currently supports
+                                       'imreg_translation', imreg_affine' and
+                                       'keypoints'
+        @param image_limits: Limits of image to use when comparing for coregistration
+        @param num_iterations: Number of iterations (Only used with 'imreg_translation')
+        """
+
+
+
+
         self._image_limits = image_limits
         self._num_iterations = num_iterations
         super(Coregister, self).__init__(str_description, ap_paramList)
 
     def process(self, obj_data):
+        """
+        Coregister images
+
+        @param obj_data: Image data wrapper
+        """
 
         reg_type = self.ap_paramList[0]()
 

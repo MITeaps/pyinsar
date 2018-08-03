@@ -45,13 +45,14 @@ class FlatEarth(PipelineItem):
     """
     
     def __init__(self, str_description, x_range = None, y_range = None, k = 2,
-                 remove_topopgraphy = False, save_correction=False):
+                 remove_topography = False, save_correction=False):
         """
         Initialize Flat Earth item
 
         @param str_description: String describing item
         @param x_range: x pixel range to process (None for entire range)
         @param y_range: y pixel range to process (None for entire range)
+        @param k: Number of satellite or aircraft passes used to generate the interferogram (1 or 2)
         @param remove_topography: Not implemented
         @param save_correction: Save the image used to correct the interferogram
         """

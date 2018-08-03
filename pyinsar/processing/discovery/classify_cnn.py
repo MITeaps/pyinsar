@@ -53,6 +53,8 @@ class ClassifyCNN(PipelineItem):
         @param batch_size: Batch size to use when classifying with Tensorflow
         @param config: Additional session configuration dictionary
         @param compare_labels: Compare measured labels with labels stored in metadata
+        @param stride: Distance between images if it necessary to cut image into tiles
+        @param size: Size of images to feed into CNN
         """
         assert stride is None and size is None or \
                stride is not None and size is not None, \

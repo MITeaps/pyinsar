@@ -49,6 +49,7 @@ class Deburst(PipelineItem):
         """
         Initialize Deburst item
 
+        @param str_description: String description of item
         @param cut_on_master: Use the master burst cut on slave
         """
         self._cut_on_master = True

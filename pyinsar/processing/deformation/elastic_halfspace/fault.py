@@ -31,7 +31,7 @@ import numpy as np
 
 class Fault(object):
     '''
-    Model a fault as a collection of small okada faults
+    *** In Development *** Model a fault as a collection of small okada faults
     '''
     def __init__(self, x_center, y_center, depth, length, width, strike, dip, num_elements_length, num_elements_width,
                  poisson_ratio = 0.25, dtype=np.float32):
@@ -43,10 +43,12 @@ class Fault(object):
         @param depth: Depth to centroid of fault
         @param length: Length of fault (along strike)
         @param width: Width of fault (along dip)
+        @param strike: Angle from north of the fault direction
         @param dip: Dip angle
         @param num_elements_length: Number of elements in the length direction
         @param num_elements_width: Number of elements in the widht direction
         @param poisson_ratio: Poisson ratio
+        @param dtype: Data type to use in calculations
         '''
         self.x_center = x_center
         self.y_center = y_center
@@ -96,6 +98,8 @@ class Fault(object):
         @param rake: Scalar Rake value
         @param x_coords: 2d array of x coordinates
         @param y_coords: 2d array of y coordinates
+        @param simple: If multiple slips per cell are given, just apply calculate
+                       deformation from a combined slip
 
         @return Surface deformations at specificed coordinates
         '''

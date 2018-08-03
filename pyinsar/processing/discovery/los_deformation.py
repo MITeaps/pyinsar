@@ -28,7 +28,7 @@
 from skdiscovery.data_structure.framework.base import PipelineItem
 
 # Pyinsar imports
-from pyinsar.processing.utilities.insar_simulator_utils import 
+# from pyinsar.processing.utilities.insar_simulator_utils import
 
 # Standard library imports
 from collections import OrderedDict
@@ -40,7 +40,10 @@ import numpy as np
 
 class LOS_Deformation(PipelineItem):
     """
-    ap_paramList[
+    *** In Development ***
+
+    ap_paramList[]
 
     def process(self, obj_data):
     """
+    pass

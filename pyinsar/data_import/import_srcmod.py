@@ -38,11 +38,13 @@ from skdaccess.utilities.image_util import SplineGeolocation
 
 def read_srcmod_data(srcmod_data, dtype=np.float64, skip_sanity_check=False):
     '''
-    Generate faults of okada sources from src mod mat files.
+    *** In Development *** Generate faults of okada sources from src mod mat files.
 
     Note: Only single segment models with a single time window are currently supported
 
-    @param input_src_mat_filename: Filename or filelike object of srcmod mat file
+    @param srcmod_data: src mod data read in from the .mat file
+    @param dtype: Data type to use
+    @param skip_sanity_check: Skip checks to ensure data was interpreted properly (Used for debugging)
     
     @return List of faults objects, list of slips, list of rakes
     '''

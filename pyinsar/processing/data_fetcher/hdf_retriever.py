@@ -37,24 +37,24 @@ from skdaccess.framework.data_class import DataFetcherBase, ImageWrapper
 # 3rd party imports
 import numpy as np
 
-class HDFDataRetriever(DataFetcherBase):
+class DataRetriever(DataFetcherBase):
     """
-    Data fetcher for retrieving hdf image data made for training in
-        convolutional neural networks
+    Data fetcher for retrieving hdf image data made for training in convolutional neural networks
     """
 
     def __init__(self, filename_list, label_list, size, dtype, num_chunks, num_training_items, num_validation_items, num_testing_items):
         """
         Initialize TrainCNN item
 
-        @param filename_list:
-        @param label_list:
-        @param size:
-        @param dtype:
-        @param num_chunks:
-        @param num_training_items:
-        @param num_validiation_items:
-        @param num_testing_items:
+        @param filename_list: List of hdf retriever files
+        @param label_list: Label for each file
+        @param size: Image shape
+        @param dtype: Data type to return
+        @param num_chunks: Number of chunks to read in at at time. This is necessary due
+                           to a performance issue with h5py
+        @param num_training_items: Number of items in each dataset to use for training
+        @param num_validation_items: Number of items from each dataset to use for validation
+        @param num_testing_items: Number of items in each dataset to use for testing
         """
         self._filename_list = filename_list
         self._label_list = label_list

@@ -60,6 +60,7 @@ class TemporalDecorrelation(PipelineItem):
         @param grid_yx_spacing: The y,x grid spacing
         @param wavelength: Wavelength for converting to phase (from path length)
         @param seed: Seed to use when generating noise
+        @param save_noise: Boolean indicating whether or not to save a copy of the noise in the results
         '''
 
         self._grid_yx_spacing = grid_yx_spacing
@@ -74,7 +75,7 @@ class TemporalDecorrelation(PipelineItem):
         """
         Add temporal decorrelation to a phase image
 
-        @obj_data: Image data wrapper
+        @param obj_data: Image data wrapper
         """
 
         vario_models = self.ap_paramList[0]()
