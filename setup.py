@@ -15,6 +15,8 @@ setup(name     = package_name,
 
       install_requires = [
           'numpy',
+          'scikit-dataaccess',
+          'scikit-discovery',
           'pandas',
           'scipy',
           'numba',
