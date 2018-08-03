@@ -6,6 +6,9 @@ package_name = 'pyinsar'
 
 package_list = find_packages()
 
+with open("README.md", 'r', encoding='utf-8') as rfile:
+    readme = rfile.read()
+
 setup(name     = package_name,
       version  = '0.0.4',
       packages = package_list,
@@ -35,5 +38,12 @@ setup(name     = package_name,
           'Programming Language :: Python :: 3 :: Only'
           ],
 
+      package_data={'pyinsar': ['license/LICENSE',
+                                'docs/pyinsar_doxygen.pdf']},
+
+
       python_requires='>=3.4',
+
+      long_description = readme,
+      long_description_content_type='text/markdown'
 )
