@@ -3,3 +3,18 @@
 </p>
 
 - Data Tools for Interferometric Synthetic-Aperture Radar Satellite Data
+
+### Introduction
+
+PyINSAR contains many tools for working InSAR.
+
+### Install
+PyInSAR requires OpenCV. To install opencv using anaconda with
+```
+conda install opencv
+```
+
+PyInSAR can then be installed via pip
+```
+pip install pyinsar
+```
