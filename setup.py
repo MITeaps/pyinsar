@@ -10,7 +10,7 @@ with open("README.md", 'r', encoding='utf-8') as rfile:
     readme = rfile.read()
 
 setup(name     = package_name,
-      version  = '0.0.4',
+      version  = '0.0.5',
       packages = package_list,
 
       install_requires = [
