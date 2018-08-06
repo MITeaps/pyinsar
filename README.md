@@ -9,7 +9,7 @@
 PyINSAR contains many tools for working InSAR.
 
 ### Install
-PyInSAR requires OpenCV. To install OpenCV using anaconda with
+PyInSAR requires OpenCV. To install OpenCV with anaconda use
 ```
 conda install opencv
 ```
