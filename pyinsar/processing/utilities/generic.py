@@ -36,7 +36,7 @@ from six.moves.urllib.request import urlopen
 import cv2
 import numpy as np
 import pandas as pd
-import osr
+from osgeo import osr, gdal
 import shapely as shp
 import shapely.geometry
 import shapely.wkt
