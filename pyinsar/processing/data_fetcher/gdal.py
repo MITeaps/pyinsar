@@ -36,7 +36,7 @@ from osgeo import gdal, osr
 from skdaccess.framework.data_class import DataFetcherBase, ImageWrapper
 
 
-class GDAL_DataFetcher(DataFetcherBase):
+class DataFetcher(DataFetcherBase):
     """
     Data fetcher for loading Images produced compatiable with GDAL
     """
@@ -52,7 +52,7 @@ class GDAL_DataFetcher(DataFetcherBase):
         self._filename_list = filename_list
         self._label_list = label_list
 
-        super(GDAL_DataFetcher, self).__init__([], verbose)
+        super(DataFetcher, self).__init__([], verbose)
 
 
     def output(self):
