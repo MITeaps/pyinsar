@@ -28,15 +28,20 @@
 # Standard library imports
 from collections import OrderedDict
 from urllib.parse import urlencode
+import itertools
 import json
 import re
+import math
+
+# Scikit Data Access
+from skdaccess.utilities.image_util import AffineGlobalCoords
 
 # 3rd party imports
 from six.moves.urllib.request import urlopen
 import cv2
 import numpy as np
 import pandas as pd
-from osgeo import osr, gdal
+from osgeo import osr, gdal, gdal_array
 import shapely as shp
 import shapely.geometry
 import shapely.wkt
@@ -633,3 +638,71 @@ def project_insar_data(in_dataset, lon_center, lat_center, interpolation=gdal.GR
                                               no_data_value=no_data_value,
                                               data_type=data_type)
     return reprojected_dataset.ReadAsArray()
+
+def get_lonlat_bounds(data_shape, wkt, geotransform):
+    """
+    Get the longitude and latitude bounds around an input image
+
+    @param data_shape: Shape of data (tuple containing y size, x size)
+    @param wkt: String of well known text describing projection
+    @param geotransform: Affine global transformation coefficients
+
+    @return Longitude minmium, longitude maximum, latitude minimum, latitude maximum
+    """
+
+    if len(data_shape) == 3:
+        data_shape = data_shape[1:]
+
+    wgs84 = osr.SpatialReference()
+    wgs84.ImportFromEPSG(4326)
+
+    spatial = osr.SpatialReference()
+    spatial.ImportFromWkt(wkt)
+
+    geo = AffineGlobalCoords(geotransform)
+
+    y_pixels = [0, data_shape[0] + 1 ]
+    x_pixels = [0, data_shape[1] + 1 ]
+
+    transform = osr.CreateCoordinateTransformation(spatial, wgs84)
+
+
+    lon_min =  math.inf
+    lon_max = -math.inf
+    lat_min =  math.inf
+    lat_max = -math.inf
+
+
+
+
+    for y, x in itertools.product(y_pixels, x_pixels):
+
+        proj_x, proj_y = geo.getProjectedYX(y, x)
+
+        lat, lon = transform.TransformPoint(proj_x, proj_y)[:2]
+
+        lon_min = min(lon_min, lon)
+        lon_max = max(lon_max, lon)
+        lat_min = min(lat_min, lat)
+        lat_max = max(lat_max, lat)
+
+
+    return [ lon_min, lon_max, lat_min, lat_max ]
+
+def get_gdal_dataset(numpy_array, wkt, geotransform):
+    """
+    Create a GDAL dataset from a numpy array
+
+    @param numpy_array: Data as a numpy array
+    @param wkt: String of well known text describing projection
+    @param geotransform: Affine global transformation coefficients
+
+    @return GDAL dataset
+    """
+
+
+    gdal_ds = gdal_array.OpenNumPyArray(numpy_array)
+    gdal_ds.SetProjection(wkt)
+    gdal_ds.SetGeoTransform(geotransform)
+
+    return gdal_ds
