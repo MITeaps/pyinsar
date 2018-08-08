@@ -33,6 +33,9 @@ import json
 import re
 import math
 
+# Pyinsar imports
+from pyinsar.processing.geography.coordinates import reproject_georaster
+
 # Scikit Data Access
 from skdaccess.utilities.image_util import AffineGlobalCoords
 
@@ -45,6 +48,7 @@ from osgeo import osr, gdal, gdal_array
 import shapely as shp
 import shapely.geometry
 import shapely.wkt
+import matplotlib as mpl
 
 
 import warnings
@@ -617,16 +621,17 @@ def generateMatplotlibRectangle(extent, **kwargs):
 def project_insar_data(in_dataset, lon_center, lat_center, interpolation=gdal.GRA_Cubic,
                        no_data_value=np.nan, data_type=gdal.GDT_Float64):
     """
-    Project InSAR data using GDAL
+    Project a GDAL dataset to transverse mercator
 
-    @param in_dataset: GDAL data set to be projected
-    @param lon_center: Longitude center of projecting
-    @param lat_center: Latitude center of projecting
-    @param interpolation: What kind of interpolation to use (GDAL Flags)
-    @param no_data_value: What value to use in the case of no data
-    @param data_type: Resulting data type (GDAL flag)
+    @param in_dataset: GDAL Dataset
+    @param lon_center: Center longitude of projection
+    @param lat_center: Center latitude of projection
+    @param interpolation: Interpolation type (GDAL flag)
+    @param no_data_value: Value to use in the case of no data
+    @param data_type: data type (GDAL flag)
 
-    @return array containing projected data
+
+    @return reprojected GDAL dataset
     """
 
     spatial = osr.SpatialReference()
@@ -637,7 +642,7 @@ def project_insar_data(in_dataset, lon_center, lat_center, interpolation=gdal.GR
                                               new_projection_wkt=spatial.ExportToWkt(),
                                               no_data_value=no_data_value,
                                               data_type=data_type)
-    return reprojected_dataset.ReadAsArray()
+    return reprojected_dataset
 
 def get_lonlat_bounds(data_shape, wkt, geotransform):
     """
