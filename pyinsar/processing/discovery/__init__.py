@@ -9,3 +9,4 @@ from .deburst import Deburst
 from .coregister import Coregister
 from .shown_cnn_classes import ShowCNNClasses
 from .flat_earth import FlatEarth
+from .project import Project
