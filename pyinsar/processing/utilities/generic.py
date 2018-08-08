@@ -684,7 +684,7 @@ def get_lonlat_bounds(data_shape, wkt, geotransform):
 
         proj_x, proj_y = geo.getProjectedYX(y, x)
 
-        lat, lon = transform.TransformPoint(proj_x, proj_y)[:2]
+        lon, lat = transform.TransformPoint(proj_x, proj_y)[:2]
 
         lon_min = min(lon_min, lon)
         lon_max = max(lon_max, lon)
