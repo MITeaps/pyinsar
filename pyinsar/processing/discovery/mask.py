@@ -30,6 +30,7 @@ import math
 # Pyinsar imports
 from pyinsar.output.export_georaster import create_georaster_from_array
 from pyinsar.processing.geography.coordinates import reproject_georaster
+from pyinsar.processing.utilities.generic import get_image_extents
 
 # skdiscovery imports
 from skdiscovery.data_structure.framework.base import PipelineItem
@@ -59,7 +60,7 @@ class Mask(PipelineItem):
         if geotransform is None and wkt is not None or \
            geotransform is not None and wkt is None:
             raise RuntimeError('Must supply both geotransform and wkt or neither of them')
-        else if geotransform is not None and wkt is not None:
+        elif geotransform is not None and wkt is not None:
             self._apply_transform = True
         else:
             self._apply_transform = False
@@ -78,21 +79,27 @@ class Mask(PipelineItem):
         Mask images
 
         @param obj_data: Image data wrapper
-        """
+         """
         for label, data in obj_data.getIterator():
 
             if self._apply_transform:
-                new_ds = create_georaster_from_array(georaster_array = data,
+                new_ds = create_georaster_from_array(georaster_array = self.mask,
                                                      geotransform = self._geotransform,
                                                      projection = self._wkt,
                                                      data_type = gdal.GDT_Int16,
                                                      no_data_value=-1)
 
-                transformed_ds = reproject_georaster(new_ds, (self._geotransform[1], np.abs(self._geotransform[5])), new_projection_wkt=wkt,
-                                                     no_data_value = -1, new_extent = extents, interpolation_method=gdal.GRA_NearestNeighbour,
+
+                new_geotransform = obj_data.info(label)['GeoTransform']
+                new_wkt = obj_data.info(label)['WKT']
+                data_extent = get_image_extents(new_geotransform, data.shape)
+
+
+                transformed_ds = reproject_georaster(new_ds, (new_geotransform[1], abs(new_geotransform[5])), new_projection_wkt=new_wkt,
+                                                     no_data_value = -1, new_extent = data_extent, interpolation_method=gdal.GRA_NearestNeighbour,
                                                      data_type=gdal.GDT_Int16)
 
-                mask = transformed_ds.ReadAsArray()
+                mask = transformed_ds.ReadAsArray().astype(bool)
 
             else:
                 mask = self.mask
