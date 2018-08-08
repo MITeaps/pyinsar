@@ -33,6 +33,7 @@ from skdiscovery.data_structure.framework.base import PipelineItem
 # 3rd party imports
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import numpy as np
 
 
 
@@ -41,7 +42,7 @@ class ShowCNNClasses(PipelineItem):
     Dispay CNN Classifications on segments of an image
     """
 
-    def __init__(str_description, class_name, colors):
+    def __init__(self, str_description, class_name, colors):
         """
         Initialize ShowCNNClassesItem
 
@@ -60,14 +61,19 @@ class ShowCNNClasses(PipelineItem):
 
         @param obj_data: Image data wrapper
         """
-        for label, data in obj_data.getIterator():
+        for data_label, data in obj_data.getIterator():
 
-            extents = obj_data.info(label)[self.class_name]['extents']
-            labels = obj_data.info(label)[self.class_name]['labels']
+            extents = obj_data.getResults()[self.class_name][data_label]['extents']
+            labels = obj_data.getResults()[self.class_name][data_label]['labels']
+            possible_labels = np.unique(labels)
+
+            if len(possible_labels) > len(self.colors):
+                raise RuntimeError('Not enough colors specified')
 
             ax = plt.axes()
 
-            for label, color in zip(labels, self.colors):
-                patch_collection = mpl.collections.PathCollection([generateMatplotlibRectangle(extent) for extent in extents[labels == label]],
-                                                                  facecolor=self, alpha = 0.5)
+            ax.imshow(data)
+            for class_label, color in zip(possible_labels, self.colors):
+                patch_collection = mpl.collections.PatchCollection([generateMatplotlibRectangle(extent) for extent in extents[labels == class_label]],
+                                                                   edgecolor=color, facecolor='none', alpha = 0.5)
                 ax.add_collection(patch_collection)
