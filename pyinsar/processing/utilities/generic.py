@@ -682,7 +682,7 @@ def get_lonlat_bounds(data_shape, wkt, geotransform):
 
     for y, x in itertools.product(y_pixels, x_pixels):
 
-        proj_x, proj_y = geo.getProjectedYX(y, x)
+        proj_y, proj_x = geo.getProjectedYX(y, x)
 
         lon, lat = transform.TransformPoint(proj_x, proj_y)[:2]
 
