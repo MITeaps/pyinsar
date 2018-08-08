@@ -25,7 +25,7 @@
 # THE SOFTWARE.
 
 # Pyinsar imports
-from pyinsar.processing.utilities.generic import project_insar_data, AffineGlobalCoords
+from pyinsar.processing.utilities.generic import project_insar_data, AffineGlobalCoords, get_gdal_dtype
 
 # Scikit data access imports
 from skdaccess.utilities.image_util import AffineGlobalCoords
@@ -106,9 +106,12 @@ class Project(PipelineItem):
             ds = gdal_array.OpenNumPyArray(data)
 
             ds.SetGeoTransform(geotransform)
-            ds.SetProjection(obj_data.info(label)['WKT'])            
+            ds.SetProjection(obj_data.info(label)['WKT'])
 
-            reprojected_ds = project_insar_data(ds, center_lon, center_lat)
+
+            gdal_dtype = get_gdal_dtype(data.dtype)
+
+            reprojected_ds = project_insar_data(ds, center_lon, center_lat, data_type = gdal_dtype)
 
             obj_data.updateData(label, reprojected_ds.ReadAsArray())
             obj_data.info(label)['WKT'] = reprojected_ds.GetProjection()

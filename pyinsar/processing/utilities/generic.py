@@ -32,6 +32,7 @@ import itertools
 import json
 import re
 import math
+import warnings
 
 # Pyinsar imports
 from pyinsar.processing.geography.coordinates import reproject_georaster
@@ -711,3 +712,27 @@ def get_gdal_dataset(numpy_array, wkt, geotransform):
     gdal_ds.SetGeoTransform(geotransform)
 
     return gdal_ds
+
+def get_gdal_dtype(numpy_dtype):
+    """
+    Get the appropriate gdal data type from the numpy data type
+
+    @param numpy_dtype: Numpy dtype
+    @return GDAL data type
+    """
+
+    if numpy_dtype == np.float32:
+        gdal_dtype = gdal.GDT_Float32
+    elif numpy_dtype == np.float64:
+        gdal_dtype = gdal.GDT_Float64
+    elif numpy_dtype == np.int16:
+        gdal_dtype = gdal.GDT_Int16
+    elif numpy_dtype == np.int32:
+        gdal_dtype = gdal.GDT_Int32
+
+    else:
+        warnings.warn('Data type not understood, using gdal.GDT_Float64', RuntimeWarning)
+        gdal_dtype = gdal.GDT_Float64
+
+    return gdal_dtype
+
