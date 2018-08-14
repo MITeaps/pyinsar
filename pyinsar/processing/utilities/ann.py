@@ -7,6 +7,15 @@ import tensorflow as tf
 import numpy as np
 
 
+def per_channel_standardization(input_tensor, name=None):
+
+    mean, variance = tf.nn.moments(input_tensor, axes=(1,2), keep_dims=True)
+    stddev = tf.sqrt(variance)
+    stddev = tf.maximum(stddev, 1.0/tf.sqrt(tf.cast(tf.reduce_prod(input_tensor.shape[1:3]), input_tensor.dtype)))
+
+    return tf.divide(input_tensor - mean, stddev, name=name)
+
+
 def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_bands = 1):
     """
     Build a convolutional neural network
@@ -27,7 +36,7 @@ def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_b
             output = tf.placeholder(tf.int64, shape=(None), name='Output')
 
         with tf.name_scope('Clean'):
-            normalize = tf.map_fn(lambda x: tf.image.per_image_standardization(x), data_input, name='Normalize')
+            normalize =  per_channel_standardization(data_input, name='Normalize')
 
         with tf.name_scope('Convolution_Layers'):
             new_image_height = image_height
@@ -84,7 +93,6 @@ def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_b
             initializer = tf.global_variables_initializer()
 
 
-
         graph.add_to_collection('fit', minimize)
         graph.add_to_collection('input', data_input)
         graph.add_to_collection('output', output)
@@ -93,6 +101,11 @@ def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_b
         graph.add_to_collection('initializer', initializer)
         graph.add_to_collection('evaluate', evaluate)
         graph.add_to_collection('logits', logits)
+        graph.add_to_collection('image_shape', num_bands)
+        graph.add_to_collection('image_shape', image_width)
+        graph.add_to_collection('image_shape', image_height)
+
+
 
         initializer.run()
         saver = tf.train.Saver(name='Saver')
@@ -133,6 +146,7 @@ def train(image_data, image_labels, model_dir,
     fit_op =op_dict['fit']
     evaluate = op_dict['evaluate']
     saver = op_dict['saver']
+    image_shape = op_dict['image_shape']
 
 
     with tf.Session(graph=graph, config=config) as session:
@@ -146,7 +160,8 @@ def train(image_data, image_labels, model_dir,
             for index in range(num_batches):
                 run_id = tf.train.global_step(session, global_step)
                 batch_slice = slice(index*batch_size, (index+1)*batch_size)
-                train_data = image_data[batch_slice].reshape(-1,100,100,1)
+                train_data = image_data[batch_slice].reshape(-1, *image_shape)
+                train_data = np.swapaxes(train_data, 1,3)
                 train_labels = image_labels[batch_slice]
                 batch_dict = {input_placeholder : train_data, output_placeholder: train_labels}
                 if train_op != None:
@@ -243,5 +258,6 @@ def restoreGraph(model_dir):
         op_dict['evaluate'] = graph.get_collection('evaluate')[0]
         op_dict['logits'] = graph.get_collection('logits')[0]
         op_dict['saver'] = saver
+        op_dict['image_shape'] = graph.get_collection('image_shape')
 
     return graph, op_dict, model_checkpoint
