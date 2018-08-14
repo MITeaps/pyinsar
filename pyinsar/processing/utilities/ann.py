@@ -7,7 +7,7 @@ import tensorflow as tf
 import numpy as np
 
 
-def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None):
+def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_bands = 1):
     """
     Build a convolutional neural network
 
@@ -23,7 +23,7 @@ def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None):
         training = tf.placeholder_with_default(False, shape=(), name='Training')
 
         with tf.variable_scope('IO'):
-            data_input = tf.placeholder(tf.float32, shape=(None, image_height, image_width, 1), name = 'Input')
+            data_input = tf.placeholder(tf.float32, shape=(None, image_height, image_width, num_bands), name = 'Input')
             output = tf.placeholder(tf.int64, shape=(None), name='Output')
 
         with tf.name_scope('Clean'):
