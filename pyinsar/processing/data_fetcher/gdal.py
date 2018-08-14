@@ -41,18 +41,15 @@ class DataFetcher(DataFetcherBase):
     Data fetcher for loading Images produced compatiable with GDAL
     """
 
-    def __init__(self, filename_list, label_list, verbose=False):
+    def __init__(self, ap_paramList, verbose=False):
         """
-        Initialize ISCE data fetcher
+        Initialize GDAL data fetcher
 
-        @param filename_list: List of filenames of ISCE interferograms
-        @param label_list: List of strings containing names for the interferograms
+        @param ap_paramList[filename_list]: AutoList of filenames of ISCE interferograms
+        @param ap_paramList[label_list]: AutoList of strings containing names for the interferograms
         @param verbose: Print extra information
         """
-        self._filename_list = filename_list
-        self._label_list = label_list
-
-        super(DataFetcher, self).__init__([], verbose)
+        super(DataFetcher, self).__init__(ap_paramList, verbose)
 
 
     def output(self):
@@ -61,11 +58,13 @@ class DataFetcher(DataFetcherBase):
 
         @return Image data wrapper
         """
+        filename_list = self.ap_paramList[0]()
+        label_list = self.ap_paramList[1]()
 
         data_dict = OrderedDict()
         meta_dict = OrderedDict()
 
-        for label, filename in zip(self._label_list, self._filename_list):
+        for label, filename in zip(label_list, filename_list):
             ds = import_georaster.open_georaster(filename)
 
             data_dict[label] = ds.ReadAsArray()
