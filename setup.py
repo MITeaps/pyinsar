@@ -44,7 +44,7 @@ setup(name     = package_name,
                                 'docs/pyinsar_doxygen.pdf']},
 
 
-      python_requires='>=3.4',
+      python_requires='>=3.6',
 
       long_description = readme,
       long_description_content_type='text/markdown'
