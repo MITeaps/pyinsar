@@ -101,11 +101,6 @@ def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_b
         graph.add_to_collection('initializer', initializer)
         graph.add_to_collection('evaluate', evaluate)
         graph.add_to_collection('logits', logits)
-        graph.add_to_collection('image_shape', num_bands)
-        graph.add_to_collection('image_shape', image_width)
-        graph.add_to_collection('image_shape', image_height)
-
-
 
         initializer.run()
         saver = tf.train.Saver(name='Saver')
@@ -146,7 +141,6 @@ def train(image_data, image_labels, model_dir,
     fit_op =op_dict['fit']
     evaluate = op_dict['evaluate']
     saver = op_dict['saver']
-    image_shape = op_dict['image_shape']
 
 
     with tf.Session(graph=graph, config=config) as session:
@@ -160,8 +154,7 @@ def train(image_data, image_labels, model_dir,
             for index in range(num_batches):
                 run_id = tf.train.global_step(session, global_step)
                 batch_slice = slice(index*batch_size, (index+1)*batch_size)
-                train_data = image_data[batch_slice].reshape(-1, *image_shape)
-                train_data = np.swapaxes(train_data, 1,3)
+                train_data = reshape_images(image_data[batch_slice])
                 train_labels = image_labels[batch_slice]
                 batch_dict = {input_placeholder : train_data, output_placeholder: train_labels}
                 if train_op != None:
@@ -204,12 +197,28 @@ def classify(image_data, model_dir, batch_size=2000, config=None):
 
         for index in range(num_batches):
             slice_index = slice(index*batch_size, min((index+1)*batch_size, num_images))
-            batched_data = {input_placeholder: image_data[slice_index].reshape(-1, image_data.shape[1], image_data.shape[2], 1)}
+            batched_data = {input_placeholder: reshape_images(image_data[slice_index])}
 
             results.append(np.argmax(logits.eval(batched_data), axis=1))
 
     return np.concatenate(results)
 
+
+def reshape_images(images):
+    """
+    Reshape input array of images to match Tensorflow's expected layout
+
+    @param images: Input image with dimensions of (image index, height, width) or (image_index, channel, height, width)
+    @return images with (image_index, height, width, channel)
+    """
+    if images.ndim == 4:
+        return np.moveaxis(images, 1,3)
+
+    elif images.ndim == 3:
+        return images.reshape(-1, *images.shape, 1)
+
+    else:
+        raise RuntimeError('Can only handle 2 or 3 dimension arrays')
 
 def length_after_valid_window(length, window, stride):
     """
@@ -258,6 +267,5 @@ def restoreGraph(model_dir):
         op_dict['evaluate'] = graph.get_collection('evaluate')[0]
         op_dict['logits'] = graph.get_collection('logits')[0]
         op_dict['saver'] = saver
-        op_dict['image_shape'] = graph.get_collection('image_shape')
 
     return graph, op_dict, model_checkpoint
