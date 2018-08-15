@@ -37,7 +37,7 @@ from skdaccess.framework.data_class import DataFetcherBase, ImageWrapper
 # 3rd party imports
 import numpy as np
 
-class DataRetriever(DataFetcherBase):
+class DataFetcher(DataFetcherBase):
     """
     Data fetcher for retrieving hdf image data made for training in convolutional neural networks
     """
@@ -67,7 +67,7 @@ class DataRetriever(DataFetcherBase):
         
         self._current_chunk = 0
         
-        super(HDFDataRetriever, self).__init__()
+        super(DataFetcher, self).__init__()
 
         assert self._num_training_items % self._num_chunks == 0, "Number of training items must be divisible by number of chunks"
         self._items_per_chunk = (self._num_training_items * len(self._label_list)) // self._num_chunks
@@ -88,7 +88,7 @@ class DataRetriever(DataFetcherBase):
 
 
         self._training_index = np.zeros((num_labels * self._num_training_items, 2), dtype = np.int)
-        self._validiation_index = np.zeros((num_labels * self._num_validation_items, 2), dtype = np.int)
+        self._validation_index = np.zeros((num_labels * self._num_validation_items, 2), dtype = np.int)
         self._testing_index = np.zeros((num_labels * self._num_testing_items, 2), dtype = np.int)
 
 
@@ -125,7 +125,7 @@ class DataRetriever(DataFetcherBase):
             testing_image_slice = image_index_slice(self._num_training_items + self._num_validation_items, self._num_testing_items)
 
             add_indices(self._training_index, image_index[training_image_slice], label_index, label, self._num_training_items)
-            add_indices(self._validiation_index, image_index[validation_image_slice], label_index, label, self._num_validation_items)
+            add_indices(self._validation_index, image_index[validation_image_slice], label_index, label, self._num_validation_items)
             add_indices(self._testing_index, image_index[testing_image_slice], label_index, label, self._num_testing_items)
 
         np.random.shuffle(self._training_index)
