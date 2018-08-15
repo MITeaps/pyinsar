@@ -100,3 +100,11 @@ class DataFetcher(DataFetcherBase):
         metadata_dict['deformation'] = kwargs
 
         return ImageWrapper(data_dict, meta_data = metadata_dict)
+
+    def multirun_enabled(self):
+        """
+        This data fetcher is multirun enabled
+
+        @return True
+        """
+        return True
