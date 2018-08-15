@@ -253,7 +253,7 @@ class DataRetriever(object):
         sorted_index = np.argsort(index)
 
         if self.chunk_size is None or self.chunk_size == 0:
-            return self.data_file_dict[label]['data_file'][dataset_name][index[sorted_index],:,:][sorted_index,:,:]
+            return self.data_file_dict[label]['data_file'][dataset_name][index[sorted_index],...][sorted_index,...]
 
         else:
             data_shape = self.data_file_dict[label]['data_file'][dataset_name].shape
@@ -265,7 +265,7 @@ class DataRetriever(object):
             return_index = np.split(sorted_index, range(self.chunk_size, len(index), self.chunk_size))
 
             for index_chunk, return_index_chunk in zip(sorted_index_list, return_index):
-                return_data[return_index_chunk] = self.data_file_dict[label]['data_file'][dataset_name][index_chunk,:,:]
+                return_data[return_index_chunk] = self.data_file_dict[label]['data_file'][dataset_name][index_chunk,...]
 
             return return_data
 
@@ -294,7 +294,7 @@ class DataRetriever(object):
 
             dataset_index = group_index == datasets[i]
 
-            final_data[dataset_index,:,:] = self._retrieve_hdf_data(label, dataset_name, local_index[dataset_index])
+            final_data[dataset_index,...] = self._retrieve_hdf_data(label, dataset_name, local_index[dataset_index])
 
         return final_data
 
@@ -312,7 +312,7 @@ class DataRetriever(object):
         for label in valid_labels:
 
             label_index = index[:,0] == label
-            image_data[label_index,:,:] = self._get_images_from_label(label, index[label_index, 1])
+            image_data[label_index,...] = self._get_images_from_label(label, index[label_index, 1])
 
         return image_data
 
