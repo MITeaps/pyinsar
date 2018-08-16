@@ -70,10 +70,13 @@ class ShowCNNClasses(PipelineItem):
             if len(possible_labels) > len(self.colors):
                 raise RuntimeError('Not enough colors specified')
 
+            fig = plt.figure()
             ax = plt.axes()
-
             ax.imshow(data)
             for class_label, color in zip(possible_labels, self.colors):
                 patch_collection = mpl.collections.PatchCollection([generateMatplotlibRectangle(extent) for extent in extents[labels == class_label]],
                                                                    edgecolor=color, facecolor='none', alpha = 0.5)
                 ax.add_collection(patch_collection)
+
+            plt.show()
+            plt.close()
