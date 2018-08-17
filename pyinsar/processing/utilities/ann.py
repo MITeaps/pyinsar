@@ -16,7 +16,8 @@ def per_channel_standardization(input_tensor, name=None):
     return tf.divide(input_tensor - mean, stddev, name=name)
 
 
-def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_bands = 1):
+def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_bands = 1,
+             conv_filters = [40,20], conv_kernels = [[9,9],[5,5]]):
     """
     Build a convolutional neural network
 
@@ -42,29 +43,34 @@ def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_b
             new_image_height = image_height
             new_image_width = image_width
 
-            conv1 = tf.layers.conv2d(normalize, filters=40, kernel_size=[9,9],padding='valid', activation=tf.nn.relu,
-                                     name = 'Convolution_1')
-            new_image_height = length_after_valid_window(new_image_height, 9, 1)
-            new_image_width = length_after_valid_window(new_image_width, 9, 1)
 
-            pool1 = tf.layers.max_pooling2d(conv1, pool_size=[2,2], strides=2, name = 'Max_Pool_1')
-            new_image_height = length_after_valid_window(new_image_height, 2, 2)
-            new_image_width = length_after_valid_window(new_image_width, 2, 2)
+            prev_layer = normalize
+            for conv_index, (filters, kernel) in enumerate(zip(conv_filters, conv_kernels)):
+                conv_layer = tf.layers.conv2d(prev_layer,
+                                              filters=filters,
+                                              kernel_size=kernel,
+                                              padding='valid',
+                                              activation=tf.nn.relu,
+                                              name = 'Convolution_' + str(conv_index))
+                new_image_height = length_after_valid_window(new_image_height, kernel[0], 1)
+                new_image_width = length_after_valid_window(new_image_width, kernel[1], 1)
+
+                pool = tf.layers.max_pooling2d(conv_layer,
+                                               pool_size=[2,2],
+                                               strides=2,
+                                               name = 'Max_Pool_' + str(conv_index))
+
+                prev_layer = pool
+                new_image_height = length_after_valid_window(new_image_height, 2, 2)
+                new_image_width = length_after_valid_window(new_image_width, 2, 2)
 
 
-            conv2 = tf.layers.conv2d(pool1, filters=20, kernel_size=[5,5],padding='valid', activation=tf.nn.relu,
-                                     name = 'Convolution_2')
-            new_image_height = length_after_valid_window(new_image_height, 5, 1)
-            new_image_width = length_after_valid_window(new_image_width, 5, 1)
-
-            pool2 = tf.layers.max_pooling2d(conv2, pool_size=[2,2], strides=2, name = 'Max_Pool_2')
-            new_image_height = length_after_valid_window(new_image_height, 2, 2)
-            new_image_width = length_after_valid_window(new_image_width, 2, 2)
-
-            pool2_flat = tf.reshape(pool2, [-1, new_image_height*new_image_width*20], name='Reshape')
+            pool_flat = tf.reshape(prev_layer,
+                                   [-1, new_image_height*new_image_width*conv_filters[-1]],
+                                   name='Reshape')
 
         with tf.name_scope('Fully_Connected_Layers'):
-                dense1 = tf.layers.dense(inputs=pool2_flat, units=1000, name='Dense_1')
+                dense1 = tf.layers.dense(inputs=pool_flat, units=1000, name='Dense_1')
                 batch_norm1 = tf.layers.batch_normalization( dense1, training=training, momentum=0.9)
                 activate1 = tf.nn.relu(batch_norm1, name='Activate_1')
 
