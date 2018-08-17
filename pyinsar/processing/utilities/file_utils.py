@@ -35,7 +35,7 @@ from pyinsar.processing.utilities.generic import subarray_slice
 # Third party imports
 import numpy as np
 
-def build_data_fetchers(filename_list, label_list, size, dtype, num_training_data_per_label, num_validation_data_per_label, num_testing_data_per_label, num_chunks):
+def build_data_fetchers(filename_list, label_list, size, dtype, num_training_data_per_label, num_validation_data_per_label, num_testing_data_per_label, num_training_chunks, num_validation_chunks = 1, num_testing_chunks=1):
     """
     Build training, validation, and testing HDF Retriever Data Fetchers
 
@@ -44,6 +44,9 @@ def build_data_fetchers(filename_list, label_list, size, dtype, num_training_dat
     @param num_training_data_per_label: Number of training data for each label
     @param num_validation_data_per_label: Number of validation data for each label
     @param num_testing_data_per_label: Number of testing data for each label
+    @param num_training_chunks = Break the training data into this many chunks
+    @param num_validation_chunks = Break the validation data into this many chunks
+    @param num_testing_chunks = Break the testing data into this many chunks
 
     @return List of HDF Retriever Data fetchers. One for training, one for validation, 
             and one for testing
@@ -115,8 +118,11 @@ def build_data_fetchers(filename_list, label_list, size, dtype, num_training_dat
 
     data_fetcher_names = ['training', 'validation', 'testing']
     data_fetcher_indices = [training_index, validation_index, testing_index]
+    num_chunks_list = [num_training_chunks, num_validation_chunks, num_testing_chunks]
 
-    for index, label in zip(data_fetcher_indices, data_fetcher_names):
+
+    for index, label, num_chunks in zip(data_fetcher_indices, data_fetcher_names, num_chunks_list):
         data_fetcher_dict[label] = DataFetcher(filename_list, label_list, size, dtype, num_chunks, index)
+
 
     return data_fetcher_dict
