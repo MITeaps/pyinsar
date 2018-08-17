@@ -206,8 +206,10 @@ class DataRetriever(object):
             self.data_file_dict[label] = OrderedDict()
             self.data_file_dict[label]['data_file'] = h5py.File(file_name,'r')
 
+            dataset_key_list = self._get_datasets(self.data_file_dict[label]['data_file'])
+
             self.data_file_dict[label]['key_list'] = [ re.search('.*data$', key_name).group() for key_name
-                                                       in self.data_file_dict[label]['data_file']
+                                                       in dataset_key_list
                                                        if re.search('.*data$', key_name) is not None ]
 
 
@@ -315,6 +317,52 @@ class DataRetriever(object):
             image_data[label_index,...] = self._get_images_from_label(label, index[label_index, 1])
 
         return image_data
+
+    def _get_dataset_key_list(self, hdf_file):
+        """
+        Get a list of keys of hdf file
+
+        @param hdf_file: h5py HDF5 file
+        @return List of keys of datasets in HDF file
+        """
+        key_list = []
+
+        def add_to_key_list(key):
+            """
+            Add key to key list if it is a dataset, otherwise skip it
+
+            @param key: Key to add to the key list
+            """
+
+            if isinstance(hdf_file[key], h5py.Dataset):
+                key_list.append(key)
+
+        hdf_file.visit(add_to_key_list)
+        return key_list
+
+    def _get_datasets(self, hdf):
+        """
+        Retreive all the data sets in an h5py file or group
+
+        @param hdf: h5py HDF File or Group
+
+        @return List of keys of datasets in hdf file
+        """
+
+        if isinstance(hdf, (h5py.File, h5py.Group)):
+            my_keys = []
+
+            for key in hdf.keys():
+                if isinstance(hdf[key], h5py.Dataset):
+                    my_keys.append(hdf.name + '/' + key)
+
+                else:
+                    my_keys += self._get_datasets(hdf[key])
+
+            return my_keys
+
+        else:
+            raise RuntimeError("Type not understood (must be a h5py file, group)")
 
 
 def rotate_image_list(in_image_extents, in_image_list, progress=True):
