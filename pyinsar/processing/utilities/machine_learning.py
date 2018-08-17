@@ -318,28 +318,6 @@ class DataRetriever(object):
 
         return image_data
 
-    def _get_dataset_key_list(self, hdf_file):
-        """
-        Get a list of keys of hdf file
-
-        @param hdf_file: h5py HDF5 file
-        @return List of keys of datasets in HDF file
-        """
-        key_list = []
-
-        def add_to_key_list(key):
-            """
-            Add key to key list if it is a dataset, otherwise skip it
-
-            @param key: Key to add to the key list
-            """
-
-            if isinstance(hdf_file[key], h5py.Dataset):
-                key_list.append(key)
-
-        hdf_file.visit(add_to_key_list)
-        return key_list
-
     def _get_datasets(self, hdf):
         """
         Retreive all the data sets in an h5py file or group
