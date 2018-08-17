@@ -100,7 +100,7 @@ class ClassifyCNN(PipelineItem):
 
             if self.compare_labels:
 
-                given_labels = info['Labels']
+                given_labels = obj_data.info(label)['Labels']
 
                 fraction_correct = np.count_nonzero(given_labels == labels) / len(labels)
 
