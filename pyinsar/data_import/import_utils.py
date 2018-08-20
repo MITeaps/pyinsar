@@ -51,7 +51,7 @@ def download_file(url, folder_path, username = None, password = None, filename =
                 r = session.get(url, auth = (username, password), stream = True)
                 r.raise_for_status()
                 with atomic_write(file_path, mode = 'wb') as data_file:
-                    shutil.copyfileobj(r.raw, data_file)
+                    shutil.copyfileobj(r.raw, data_file, 1024*1024*10)
                     return file_path
             except requests.exceptions.HTTPError as errh:
                 print("http error:", errh)

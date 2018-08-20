@@ -1,12 +1,56 @@
+# The MIT License (MIT)
+# Copyright (c) 2018 Massachusetts Institute of Technology
+#
+# Authors: Cody Rude
+# This software is part of the NSF DIBBS Project "An Infrastructure for
+# Computer Aided Discovery in Geoscience" (PI: V. Pankratius) and
+# NASA AIST Project "Computer-Aided Discovery of Earth Surface
+# Deformation Phenomena" (PI: V. Pankratius)
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+
 # Standard library imports
 from collections import OrderedDict
+from urllib.parse import urlencode
+import itertools
+import json
 import re
+import math
+import warnings
+
+# Pyinsar imports
+from pyinsar.processing.geography.coordinates import reproject_georaster
+
+# Scikit Data Access
+from skdaccess.utilities.image_util import AffineGlobalCoords
 
 # 3rd party imports
+from six.moves.urllib.request import urlopen
 import cv2
 import numpy as np
 import pandas as pd
-import osr
+from osgeo import osr, gdal, gdal_array
+import shapely as shp
+import shapely.geometry
+import shapely.wkt
+import matplotlib as mpl
+
 
 import warnings
 with warnings.catch_warnings():
@@ -20,7 +64,12 @@ from sklearn.linear_model import RANSACRegressor
 
 
 def get_image_extents(geotransform, shape):
+    """
+    Get extents of in projection coordinates
 
+    @param geotransform: Geo transform for converting between pixel and projected coordinates
+    @param shape: Shape of image
+    """
     georaster_x_size = shape[1]
     georaster_y_size = shape[0]
     xmin = geotransform[0]
@@ -80,14 +129,14 @@ def proj4StringToDictionary(proj4_string):
 def sorted_alphanumeric(l):
     '''
     Sort a list of strings with numbers
- 
+
     @param l: The list
- 
+
     @return The sorted list
     '''
     convert = lambda text: int(text) if text.isdigit() else text
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
-    
+
     return sorted(l, key = alphanum_key)
 
 def phase_shift(data, phase):
@@ -122,6 +171,7 @@ def rotate(col_vectors, az, ay, ax, dtype=np.float64):
     @param az: Angle for rotation about the z axis
     @param ay: Angle for rotation about the y axis
     @param ax: Angle for rotation about the x axis
+    @param dtype: Data type to use
 
     @param return Rotated vectors
     '''
@@ -283,6 +333,16 @@ def scale_image(input_data, vmin=None, vmax=None):
 
 
 def keypoints_align(img1, img2, max_matches=40, invert=True):
+    """
+    *** In Development *** Determine transformation matrix for aligning images
+
+    @param img1: First image
+    @param img2: Second image
+    @param max_matches: Maximum number of matches between the two images
+    @param invert: Invert the transformation matrix
+
+    @return: Transformation matrix that connects two images
+    """
 
     def buildMatchedPoints(in_matches, query_kp, train_kp):
         query_index = [match.queryIdx for match in in_matches]
@@ -374,60 +434,305 @@ class FindNearestPixel(object):
         return res
 
 
-class AffineGlobalCoords(object):
-    '''
-    Convert between projected and raster coordinates using an affine transformation
-    '''
 
-    def __init__(self, aff_coeffs, center_pixels=False):
-        '''
-        Initialize Global Coords Object
+def subarray_slice(index, num_items):
+    """
+    Returns a slice that selects for selecting a chunk out of an array
 
-        @param aff_coeffs: Affine coefficients
-        @param center_pixels: Apply offsets so that integer values refer to the
-                              center of the pixel and not the edge
+    @param index: Which chunk to select
+    @param num_items: Number of items in a chunk
+    @return A slice for selecting index*num_items to (index+1)*num_items
+    """
+    return slice(index * num_items, (index+1) * num_items)
 
-        '''
 
-        self._aff_coeffs = aff_coeffs
+def find_data_asf(lat, lon, processingLevel='SLC', platform='Sentinel-1A,Sentinel-1B',
+                  **kwargs):
+    """
+    Search Alaska Satellite Facility for data
 
-        if center_pixels:
-            self._x_offset = 0.5
-            self._y_offset = 0.5
+    @param lat: Latitude
+    @param lon: Longitude
+    @param processingLevel: Processing level of data
+    @param platform: Instrument to search
+    @param kwargs: All additional kwargs will be used to search ASF
+                   See https://www.asf.alaska.edu/get-data/learn-by-doing/
+    @returns: List of available data matching the search criteria
+    """
+    baseurl = 'https://api.daac.asf.alaska.edu/services/search/param?'
 
+    if 'intersectsWith' in kwargs:
+        raise RuntimeWarning('Ignoring lat/lon as intersectsWith keyword was supplied')
+
+    else:
+        point = shp.geometry.Point(lon, lat)
+        kwargs['intersectsWith'] = point.to_wkt()
+
+    if 'output' in kwargs:
+        raise RuntimeWarning("Keyword 'output' ignored")
+
+
+    kwargs['output'] = 'json'
+    kwargs['processingLevel'] = 'SLC'
+    kwargs['platform'] = platform
+
+    search = urlencode(kwargs)
+    search_url = baseurl+search
+
+    with urlopen(baseurl+search) as urldata:
+        data = json.load(urldata)
+
+    return data[0]
+
+
+def _get_key(data):
+    """
+    Retrieve the key for a particular image
+
+    @param data: Dictionary of information from the Alaska Satellite Facility
+    @return Dictionary key for data
+    """
+    return data['track'], data['frameNumber']
+
+
+
+def select_max_matched_data(sentinel_data_list):
+    """
+    Select the data that can be combined into an interferogram
+
+    The particular frame and track that maximizes the number
+    of useable data is chosen
+
+    @param sentinel_data_list:
+    @returns:
+    """
+
+    def add_to_key(key):
+        """
+        Count the number of overlapping images
+
+        @param key: Key to use to identify image location
+        """
+
+        if key not in max_keys:
+            max_keys[key] = 1
         else:
-            self._x_offset = 0.0
-            self._y_offset = 0.0
+            max_keys[key] += 1
+
+    max_keys = OrderedDict()
+    for data in sentinel_data_list:
+        add_to_key(_get_key(data))
+
+    max_orbit = None
+    max_count = -1
+    for orbit, count in max_keys.items():
+        if max_count < count:
+            max_count = count
+            max_orbit = orbit
+
+    final_data_list = []
+    for data in sentinel_data_list:
+        if _get_key(data) == max_orbit:
+            final_data_list.append(data)
+
+    return final_data_list
 
 
-    def getProjectedYX(self, y_array, x_array):
-        '''
-        Convert pixel coordinates to projected coordinates
+def match_data(sentinel_data_list):
+    """
+    Seperate into sets of overlapping data
 
-        @param y_in
-        @param x_in
-        '''
-        y = y_array + self._y_offset
-        x = x_array + self._x_offset
-        return (self._aff_coeffs[3] + self._aff_coeffs[4]*x + self._aff_coeffs[5]*y,
-                self._aff_coeffs[0] + self._aff_coeffs[1]*x + self._aff_coeffs[2]*y)
+    Seperates based on relative orbit, track, and frame
+
+    @param sentinel_data_list: List of information for different images
+    @return: Dictionary of lists of overlapping data
+    """
+
+    def add_info(data, data_dict):
+        """
+        Add information about image to a dictionary
+
+        @param data: Input data about an image
+        @param data_dict: Dictionary to store data
+        """
+        key = _get_key(data)
+        if key not in data_dict:
+            data_dict[key] = []
+
+        data_dict[key].append(data)
+
+    organized_data_dict = OrderedDict()
+    for data in sentinel_data_list:
+        add_info(data, organized_data_dict)
+
+    return organized_data_dict
 
 
-    def getRasterYX(self, y_proj, x_proj):
-        '''
-        Convert from projected coordinates to pixel coordinates
 
-        @
-        '''
-        c0 = self._aff_coeffs[0]
-        c1 = self._aff_coeffs[1]
-        c2 = self._aff_coeffs[2]
-        c3 = self._aff_coeffs[3]
-        c4 = self._aff_coeffs[4]
-        c5 = self._aff_coeffs[5]
+def find_earthquake_pairs(organized_data, date):
+    """
+    Select image pairs around a specified date
+
+    @param organized_data: Dictionary of information about data that
+                           has been organized into overlapping images
+
+    @param date: Date of the event of interest
+    @return Dictionary containing lists of pairs of images around the specified event
+    """
+
+    if isinstance(date, str):
+        date = pd.to_datetime(date)
+
+    return_data_dict = OrderedDict()
+    remove_list = []
+    for label, data in organized_data.items():
+        if len(data) > 1:
+            date_array = np.array([pd.to_datetime(info['sceneDate']) for info in data])
+            sorted_index = np.argsort(date_array)
+            date_array = date_array[sorted_index]
+
+            date_index = np.searchsorted(date_array, date)
+            if date_index != 0 and date_index != len(date_array):
+                first_image_index = sorted_index[date_index-1]
+                second_image_index = sorted_index[date_index]
+
+                return_data_dict[label] = []
+                return_data_dict[label].append(data[first_image_index])
+                return_data_dict[label].append(data[second_image_index])
+
+    return return_data_dict
 
 
-        y = (c4*(c0-x_proj) + c1*y_proj - c1*c3) / (c1*c5 - c2*c4)
-        x = -(c5 * (c0 - x_proj) + c2*y_proj - c2*c3) / (c1*c5 - c2*c4)
+def generateMatplotlibRectangle(extent, **kwargs):
+    """
+    Generate a matplotlib rectangle from a extents
 
-        return y - self._y_offset, x - self._x_offset
+    @param extent: Container holding the extent (x_min, x_max, y_min, y_max)
+    @param kwargs: Extra keyword arguments passed to matplotlib.patches.Rectangle
+
+    @return Matplotlib rectangle
+    """
+    xy = [extent[0], extent[2]]
+    width = extent[1] - extent[0]
+    height = extent[3] - extent[2]
+
+    return mpl.patches.Rectangle(xy, width, height, **kwargs)
+
+
+def project_insar_data(in_dataset, lon_center, lat_center, interpolation=gdal.GRA_Cubic,
+                       no_data_value=np.nan, data_type=gdal.GDT_Float64):
+    """
+    Project a GDAL dataset to transverse mercator
+
+    @param in_dataset: GDAL Dataset
+    @param lon_center: Center longitude of projection
+    @param lat_center: Center latitude of projection
+    @param interpolation: Interpolation type (GDAL flag)
+    @param no_data_value: Value to use in the case of no data
+    @param data_type: data type (GDAL flag)
+
+
+    @return reprojected GDAL dataset
+    """
+
+    spatial = osr.SpatialReference()
+    spatial.ImportFromProj4(f'+proj=tmerc +lat_0={lat_center} +lon_0={lon_center} +datum=WGS84 +ellps=WGS84 +k=0.9996 +no_defs')
+    reprojected_dataset = reproject_georaster(georaster=in_dataset,
+                                              interpolation_method=interpolation,
+                                              new_cell_sizes=[100,100],
+                                              new_projection_wkt=spatial.ExportToWkt(),
+                                              no_data_value=no_data_value,
+                                              data_type=data_type)
+    return reprojected_dataset
+
+def get_lonlat_bounds(data_shape, wkt, geotransform):
+    """
+    Get the longitude and latitude bounds around an input image
+
+    @param data_shape: Shape of data (tuple containing y size, x size)
+    @param wkt: String of well known text describing projection
+    @param geotransform: Affine global transformation coefficients
+
+    @return Longitude minmium, longitude maximum, latitude minimum, latitude maximum
+    """
+
+    if len(data_shape) == 3:
+        data_shape = data_shape[1:]
+
+    wgs84 = osr.SpatialReference()
+    wgs84.ImportFromEPSG(4326)
+
+    spatial = osr.SpatialReference()
+    spatial.ImportFromWkt(wkt)
+
+    geo = AffineGlobalCoords(geotransform)
+
+    y_pixels = [0, data_shape[0] + 1 ]
+    x_pixels = [0, data_shape[1] + 1 ]
+
+    transform = osr.CreateCoordinateTransformation(spatial, wgs84)
+
+
+    lon_min =  math.inf
+    lon_max = -math.inf
+    lat_min =  math.inf
+    lat_max = -math.inf
+
+
+
+
+    for y, x in itertools.product(y_pixels, x_pixels):
+
+        proj_y, proj_x = geo.getProjectedYX(y, x)
+
+        lon, lat = transform.TransformPoint(proj_x, proj_y)[:2]
+
+        lon_min = min(lon_min, lon)
+        lon_max = max(lon_max, lon)
+        lat_min = min(lat_min, lat)
+        lat_max = max(lat_max, lat)
+
+
+    return [ lon_min, lon_max, lat_min, lat_max ]
+
+def get_gdal_dataset(numpy_array, wkt, geotransform):
+    """
+    Create a GDAL dataset from a numpy array
+
+    @param numpy_array: Data as a numpy array
+    @param wkt: String of well known text describing projection
+    @param geotransform: Affine global transformation coefficients
+
+    @return GDAL dataset
+    """
+
+
+    gdal_ds = gdal_array.OpenNumPyArray(numpy_array)
+    gdal_ds.SetProjection(wkt)
+    gdal_ds.SetGeoTransform(geotransform)
+
+    return gdal_ds
+
+def get_gdal_dtype(numpy_dtype):
+    """
+    Get the appropriate gdal data type from the numpy data type
+
+    @param numpy_dtype: Numpy dtype
+    @return GDAL data type
+    """
+
+    if numpy_dtype == np.float32:
+        gdal_dtype = gdal.GDT_Float32
+    elif numpy_dtype == np.float64:
+        gdal_dtype = gdal.GDT_Float64
+    elif numpy_dtype == np.int16:
+        gdal_dtype = gdal.GDT_Int16
+    elif numpy_dtype == np.int32:
+        gdal_dtype = gdal.GDT_Int32
+
+    else:
+        warnings.warn('Data type not understood, using gdal.GDT_Float64', RuntimeWarning)
+        gdal_dtype = gdal.GDT_Float64
+
+    return gdal_dtype
+

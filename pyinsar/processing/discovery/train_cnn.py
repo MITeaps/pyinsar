@@ -24,26 +24,53 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+# Standard library imports
+from collections import OrderedDict
+
+# Pyinsar imports
+from pyinsar.processing.utilities import ann
+
 # Scikit Discovery imports
 from skdiscovery.data_structure.framework.base import PipelineItem
 
-# Pyinsar imports
-# from pyinsar.processing.utilities.insar_simulator_utils import
-
-# Standard library imports
-from collections import OrderedDict
 
 # 3rd party imports
 import numpy as np
 
 
+class TrainCNN(PipelineItem):
+    """ Train a CNN """
 
-class LOS_Deformation(PipelineItem):
-    """
-    *** In Development ***
+    def __init__(self, str_description, cnn_network_dir, batch_size, config=None):
+        """
+        Initialize TrainCNN item
 
-    ap_paramList[]
+        @param str_description: String describing item
+        @param cnn_network_dir: Strining containing the directiory where the CNN is stored
+        @param batch_size: Batch size to use when training data
+        @param config: Dictinoary of extra options to use with the tensorflow session
+        """
+
+        self.cnn_network_dir = cnn_network_dir
+        self.batch_size = batch_size
+        self.config = config
+        super(TrainCNN, self).__init__(str_description, [])
 
     def process(self, obj_data):
-    """
-    pass
+        """
+        Training CNN using data in Image wrapper
+
+        @param obj_data: Image wrapper
+        """
+
+        for label, data in obj_data.getIterator():
+
+            data_labels = obj_data.info(label)['Labels']
+
+            ann.train(image_data = data,
+                      image_labels = data_labels,
+                      model_dir=self.cnn_network_dir,
+                      batch_size=self.batch_size,
+                      num_epochs=1,
+                      shuffle = False,
+                      config=self.config)

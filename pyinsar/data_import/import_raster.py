@@ -54,8 +54,7 @@ def read_rsc_header_file(file_path):
 
 def open_gacos_tropospheric_delays(tropodelay_header_path):
     '''
-    Open a topospheric delay map computed by the Generic Atmospheric
-    Correction Online Service for InSAR (GACOS)
+    Open a topospheric delay map computed by the Generic Atmospheric Correction Online Service for InSAR (GACOS)
     
     @param tropodelay_header_path: Path to the header file (.ztd.rsc or .dztd.rsc)
     

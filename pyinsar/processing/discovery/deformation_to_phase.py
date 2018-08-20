@@ -38,13 +38,14 @@ import numpy as np
 
 class DeformationToPhase(PipelineItem):
     '''
-
+    Convert deformation to phas
     '''
 
     def __init__(self, str_description, ap_paramList, xx, yy):
         '''
         Initialize Deformation to Phase pipeline item
     
+        @param str_description: String description of item
         @param ap_paramList[track_angle] = Auto param of the track angle
         @param ap_paramList[min_ground_range_1] = Auto param of min_ground_range_1
         @param ap_paramList[height_1] = Auto param of height_1
@@ -61,6 +62,11 @@ class DeformationToPhase(PipelineItem):
         super(DeformationToPhase, self).__init__(str_description, ap_paramList)
 
     def process(self, obj_data):
+        """
+        Convert deformations in a data wrapper to phases
+
+        @param obj_data: Image data wrapper
+        """
 
         track_angle = self.ap_paramList[0]()
         min_ground_range_1 = self.ap_paramList[1]()

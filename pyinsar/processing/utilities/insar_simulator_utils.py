@@ -60,7 +60,7 @@ def mask_deformation(deformation, threshold_function = threshold_li):
     '''
     Mask image using a threshold function
 
-    @param image: Image to mask
+    @param deformation: Deformation to mask
     @param threshold_function: Function to calculate the threshold value
     @return Masked image
     '''
@@ -84,6 +84,7 @@ def calc_bounding_box(image, threshold_function = threshold_li):
     Calcluate the bounding box around an image using the li threshold
 
     @param image: Input image
+    @param threshold_function: Threshold function to use
     @return Extents of a bounding box around the contents in the image (x_min, x_max, y_min, y_max)
     '''
     thresh = threshold_function(image)
@@ -114,7 +115,7 @@ def crop_nans(image):
     """
     Shrink image by removing nans
 
-    @param input image:
+    @param image: Input image
     @return: Image cropped around valid data
     """
     thresh_image = ~np.isnan(image)
@@ -129,6 +130,9 @@ def determine_deformation_bounding_box(deformations, largest_box=True, **kwargs)
     Calculate the extent of the deformation in image coordinates
 
     @param deformations: Input deformations
+    @param largest_box: Choose a bounding max that encomposses all selected values in all dimensions
+    @param kwargs: Any additional keyword arguments passed to calc_bounding_box
+
     @return Extents deformations (x_min, x_max, y_min, y_max)
     '''
     bounds = np.stack([calc_bounding_box(np.abs(deformations[i,:,:]), **kwargs) for i in range(3)])
@@ -146,6 +150,8 @@ def determine_x_y_bounds(deformations, x_array, y_array, offset=5000, **kwargs):
     @param x_array: x coordinates
     @param y_array: y coordinatse
     @param offset: Size to extend the extents of the box
+    @param kwargs: Any additional keyword arguments passed to determine_deformation_bounding_box
+
     @return  Extents of the deformation plus the offset (x_min, x_max, y_min, y_max)
     '''
 
@@ -177,8 +183,8 @@ def generate_interferogram_from_deformation(track_angle,
     Generate an interferogram from deformations
 
     @param track_angle: Satellite track angle
-    @param min_ground_range: Minimum ground range to deformations
-    @param height: Height of satellite
+    @param min_ground_range_1: Minimum ground range to deformations for first pass
+    @param height_1: Height of satellite for first pass
     @param is_right_looking: The satellite is looking to the right
     @param wavelength: Wavelength of the signal
     @param k: number of passes (1 or 2)
@@ -186,6 +192,8 @@ def generate_interferogram_from_deformation(track_angle,
     @param xx: x coordinates of deformation
     @param yy: y coordinates of deformation
     @param projected_topography: Elevation data
+    @param min_ground_range_2: Minimum ground range to deformations for second pass
+    @param height_2: Height of satellite for second pass
 
     @return Inteferogram due to the deformations
     '''

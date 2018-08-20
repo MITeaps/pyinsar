@@ -44,7 +44,7 @@ def generate_minimum_ground_range_limits(satellite_height, incidence_ranges, ima
     """
     Determine the limits of minimum ground ranges of a satellite pass
 
-    @param satellite height: Height of satellite
+    @param satellite_height: Height of satellite
     @param incidence_ranges: Range of valid incidence angles (shape of [:,2])
     @param image_size: Length of image
     @return range of possible minimum ground ranges
@@ -61,7 +61,7 @@ def generate_phase_samples_from_looks_and_ranges(deformation_list, xx, yy, satel
     """
     Generates different possible phases from a list of deformations due to different track angles and groud ranges.
 
-    @param deformation list: List of deformations
+    @param deformation_list: List of deformations
     @param xx: x coordinates
     @param yy: y coordinates
     @param satellite_height: Height of satellite
@@ -253,7 +253,7 @@ class DataRetriever(object):
         sorted_index = np.argsort(index)
 
         if self.chunk_size is None or self.chunk_size == 0:
-            return self.data_file_dict[label]['data_file'][dataset_name][index[sorted_index],:,:][sorted_index,:,:]
+            return self.data_file_dict[label]['data_file'][dataset_name][index[sorted_index],...][sorted_index,...]
 
         else:
             data_shape = self.data_file_dict[label]['data_file'][dataset_name].shape
@@ -265,7 +265,7 @@ class DataRetriever(object):
             return_index = np.split(sorted_index, range(self.chunk_size, len(index), self.chunk_size))
 
             for index_chunk, return_index_chunk in zip(sorted_index_list, return_index):
-                return_data[return_index_chunk] = self.data_file_dict[label]['data_file'][dataset_name][index_chunk,:,:]
+                return_data[return_index_chunk] = self.data_file_dict[label]['data_file'][dataset_name][index_chunk,...]
 
             return return_data
 
@@ -294,7 +294,7 @@ class DataRetriever(object):
 
             dataset_index = group_index == datasets[i]
 
-            final_data[dataset_index,:,:] = self._retrieve_hdf_data(label, dataset_name, local_index[dataset_index])
+            final_data[dataset_index,...] = self._retrieve_hdf_data(label, dataset_name, local_index[dataset_index])
 
         return final_data
 
@@ -312,7 +312,7 @@ class DataRetriever(object):
         for label in valid_labels:
 
             label_index = index[:,0] == label
-            image_data[label_index,:,:] = self._get_images_from_label(label, index[label_index, 1])
+            image_data[label_index,...] = self._get_images_from_label(label, index[label_index, 1])
 
         return image_data
 
@@ -341,28 +341,3 @@ def rotate_image_list(in_image_extents, in_image_list, progress=True):
     return new_image_extents, new_image_data
 
 
-
-def project_insar_data(in_dataset, lon_center, lat_center, interpolation=gdal.GRA_Cubic,
-                       no_data_value=np.nan, data_type=gdal.GDT_Float64):
-    """
-    Project InSAR data using GDAL
-
-    @param in_dataset: GDAL data set to be projected
-    @param lon_center: Longitude center of projecting
-    @param lat_center: Latitude center of projecting
-    @param interpolation: What kind of interpolation to use (GDAL Flags)
-    @param no_data_value: What value to use in the case of no data
-    @param data_type: Resulting data type (GDAL flag)
-
-    @return array containing projected data
-    """
-
-    spatial = osr.SpatialReference()
-    spatial.ImportFromProj4(f'+proj=tmerc +lat_0={lat_center} +lon_0={lon_center} +datum=WGS84 +ellps=WGS84 +k=0.9996 +no_defs')
-    reprojected_dataset = reproject_georaster(georaster=in_dataset,
-                                              interpolation_method=interpolation,
-                                              new_cell_sizes=[100,100],
-                                              new_projection_wkt=spatial.ExportToWkt(),
-                                              no_data_value=no_data_value,
-                                              data_type=data_type)
-    return reprojected_dataset.ReadAsArray()

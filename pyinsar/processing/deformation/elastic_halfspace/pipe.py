@@ -85,12 +85,12 @@ def compute_open_pipe_displacement(open_pipe_x,
     '''
     Compute the surface displacements for an open pipe
     
-    @param closed_pipe_x: x cooordinate for the pipe's center
-    @param closed_pipe_y: y cooordinate for the pipe's center
-    @param closed_pipe_depth_0: Pipe's top depth with minimal pressurization
-    @param closed_pipe_depth_1: Pipe's top depth with maximal pressurization
-    @param closed_pipe_depth_2: Pipe's bottom depth
-    @param closed_pipe_radius: Pipe's radius
+    @param open_pipe_x: x cooordinate for the pipe's center
+    @param open_pipe_y: y cooordinate for the pipe's center
+    @param open_pipe_depth_0: Pipe's top depth with minimal pressurization
+    @param open_pipe_depth_1: Pipe's top depth with maximal pressurization
+    @param open_pipe_depth_2: Pipe's bottom depth
+    @param open_pipe_radius: Pipe's radius
     @param poisson_ratio: Poisson's ratio
     @param pressurization: Change of pressure applied to the pipe
     @param shear_modulus: Shear modulus

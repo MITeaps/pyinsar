@@ -66,7 +66,7 @@ class RotateSquares(PipelineItem):
         Initialize RotateSquares object
 
         @param str_description: String describing class
-        @param ap_param[SplineOrder]: Spline order used in interpolation
+        @param ap_paramList[SplineOrder]: Spline order used in interpolation
         @param square_result_name: Name of pipeline item that contains the Shapely squares
         @param angles: Angles used when rotating squares
         @param clean: Remove any squares that contain NaN's

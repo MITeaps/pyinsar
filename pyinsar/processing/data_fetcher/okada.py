@@ -38,20 +38,20 @@ class DataFetcher(DataFetcherBase):
         """
         Initialize Okada DataFetcher
 
-        @ap_paramList[fault_centroid_x]: x centroid
-        @ap_paramList[fault_centroid_y]: y centroid
-        @ap_paramList[fault_centroid_depth]: Fault depth
-        @ap_paramList[fault_strike]: Fault strike
-        @ap_paramList[fault_dip]: Fault dip
-        @ap_paramList[fault_length]: Fault Length
-        @ap_paramList[fault_width]: Fault width
-        @ap_paramList[fault_rake]: Fault rake
-        @ap_paramList[fault_slip]: Fault slip
-        @ap_paramList[fault_open]: Fault open
-        @ap_paramList[poisson_ratio]: Poisson ratio
-        @xx_array: Array of x coordinates
-        @yy_array: Array of y coordinates
-        @verbose: Print out extra information
+        @param ap_paramList[fault_centroid_x]: x centroid
+        @param ap_paramList[fault_centroid_y]: y centroid
+        @param ap_paramList[fault_centroid_depth]: Fault depth
+        @param ap_paramList[fault_strike]: Fault strike
+        @param ap_paramList[fault_dip]: Fault dip
+        @param ap_paramList[fault_length]: Fault Length
+        @param ap_paramList[fault_width]: Fault width
+        @param ap_paramList[fault_rake]: Fault rake
+        @param ap_paramList[fault_slip]: Fault slip
+        @param ap_paramList[fault_open]: Fault open
+        @param ap_paramList[poisson_ratio]: Poisson ratio
+        @param xx_array: Array of x coordinates
+        @param yy_array: Array of y coordinates
+        @param verbose: Print out extra information
         """
         self._xx_array = xx_array
         self._yy_array = yy_array
@@ -100,3 +100,11 @@ class DataFetcher(DataFetcherBase):
         metadata_dict['deformation'] = kwargs
 
         return ImageWrapper(data_dict, meta_data = metadata_dict)
+
+    def multirun_enabled(self):
+        """
+        This data fetcher is multirun enabled
+
+        @return True
+        """
+        return True

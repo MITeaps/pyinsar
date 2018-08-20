@@ -24,26 +24,25 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-# Scikit Discovery imports
-from skdiscovery.data_structure.framework.base import PipelineItem
-
-# Pyinsar imports
-# from pyinsar.processing.utilities.insar_simulator_utils import
-
 # Standard library imports
 from collections import OrderedDict
 
-# 3rd party imports
-import numpy as np
+# scikit discovery imports
+from skdiscovery.data_structure.framework.base import PipelineItem
 
+# pyinsar imports
+from pyinsar.processing.utilities.insar_simulator_utils import wrap
 
-
-class LOS_Deformation(PipelineItem):
-    """
-    *** In Development ***
-
-    ap_paramList[]
+class WrapPhase(PipelineItem):
+    """ Pipeline Item that wraps phase """
 
     def process(self, obj_data):
-    """
-    pass
+        """
+        Wrap phase of images
+
+        @param obj_data: Image data wrapper
+        """
+
+        for label, data in obj_data.getIterator():
+
+            obj_data.updateData(label, wrap(data))

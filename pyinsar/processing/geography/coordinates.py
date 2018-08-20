@@ -435,8 +435,8 @@ def reproject_georaster(georaster,
                             new_extent[3], 
                             0., 
                             -new_cell_sizes[1])
-        new_x_size = int(abs(new_extent[1] - new_extent[0])/new_cell_sizes[0])
-        new_y_size = int(abs(new_extent[3] - new_extent[2])/new_cell_sizes[1])
+        new_x_size = int(round(abs(new_extent[1] - new_extent[0])/new_cell_sizes[0]))
+        new_y_size = int(round(abs(new_extent[3] - new_extent[2])/new_cell_sizes[1]))
 
     number_of_bands = georaster.RasterCount
     

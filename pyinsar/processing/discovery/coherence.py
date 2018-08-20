@@ -48,6 +48,8 @@ class Coherence(PipelineItem):
         @param window: Tuple indicating the y and x window size
         @param pairing: How to pair slc images. "neighbor" computes
                         coherence between neighboring images
+
+        @param use_progress_bar: Display progress using a progress bar
         '''
 
         self.window = window
