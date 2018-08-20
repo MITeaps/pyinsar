@@ -160,112 +160,125 @@ def extract_subgeoarray(georaster_array,
     return new_georaster_array, new_georaster_extent
 
 @jit(nopython = True)
-def sample_nd_array(array, subarray_shape, steps = (1, 1)):
+def get_valid_subarray_indexes(array,
+                               subarray_shape,
+                               steps = (1, 1),
+                               is_shape_centered = False):
     '''
-    Extract all the possible sub-arrays of a given shape that do not contain any
-    NaN
+    Get the indexes of all the possible sub-arrays that do not contain any NaN
     
-    @param array: A nD NumPy array (at least 2D)
-    @param subarray_shape: The shape of the sub-arrays
-    @param steps: The step between each sub-array for each axis, to avoid 
+    @param array: A ND NumPy array. The N - 2 first axes represent the variables,
+                  the last two axes represent which the indexes are gotten
+    @param subarray_shape: The 2D shape of the sub-arrays
+    @param steps: The step between each sub-array for the last two axes, to avoid 
                   sampling all the possible sub-arrays
+    @param is_shape_centered: True if the sub-arrays are defined from the
+                              central cell, false if they are defined from the
+                              top-left cell
     
-    @return The sub-arrays as a (n+1)D NumPy array
+    @return The 2D indexes of the sub-arrays in a list
     '''
-    assert (len(array.shape) >= 2 and len(subarray_shape) >= 2), 'Array must be at least 2D'
-
-    subarray = np.empty(subarray_shape)
-    subarrays = np.expand_dims(subarray, axis = 0)
-    is_empty = True
-    for j in range(0, array.shape[0] - subarray_shape[0], steps[0]):
-        for i in range(0, array.shape[1] - subarray_shape[1], steps[1]):
-            subarray = array[..., j:j + subarray_shape[-2], i:i + subarray_shape[-1]]
-            if np.isnan(subarray).any() == False:
-                if is_empty == True:
-                    subarrays[0] = subarray
-                    is_empty = False
-                else:    
-                    expanded_subarray = np.expand_dims(subarray, axis = 0)
-                    subarrays = np.concatenate((subarrays, expanded_subarray))
-        
-    return subarrays
-
-@jit(nopython = True, nogil = True, parallel = True)
-def sample_2d_array(array,
-                    subarray_shape,
-                    steps = (1, 1), 
-                    is_shape_centered = False):
-    '''
-    Extract all the possible sub-arrays that do not contain any NaN
-    
-    @param array: A 2D NumPy array
-    @param subarray_shape: The shape of the sub-arrays
-    @param steps: The step between each sub-array for each axis, to avoid 
-                  sampling all the possible sub-arrays
-    @param is_shape_centered: True if the sub-arrays should be defined from
-                              their central cell, false if they should be
-                              defined from their top-left corner
-    
-    @return The sub-arrays as a 3D NumPy array
-    '''
-    assert (len(array.shape) == 2 and len(subarray_shape) == 2), 'Array must be 2D'
+    assert len(array.shape) >= 2, 'Array must be at least 2D'
+    assert len(subarray_shape) == 2, 'Sub-array shape must be 2D'
     
     left_shape = (0, 0)
-    right_shape = subarray_shape
+    right_shape = (subarray_shape[-2],
+                   subarray_shape[-1])
     if is_shape_centered == True:
-        left_shape = (int(subarray_shape[0]/2), int(subarray_shape[1]/2))
-        right_shape = (int(subarray_shape[0]/2) + 1, int(subarray_shape[1]/2) + 1)
+        left_shape = (int(subarray_shape[-2]/2),
+                      int(subarray_shape[-1]/2))
+        right_shape = (int(subarray_shape[-2]/2) + 1,
+                       int(subarray_shape[-1]/2) + 1)
 
-    subarray_indices = []
-    for j in range(left_shape[0], array.shape[0] - right_shape[0], steps[0]):
-        for i in range(left_shape[1], array.shape[1] - right_shape[1], steps[1]):
-            subarray = array[j - left_shape[0]:j + right_shape[0],
-                             i - left_shape[1]:i + right_shape[1]]
+    subarray_indexes = []
+    for j in range(left_shape[-2], array.shape[-2] - right_shape[-2], steps[-2]):
+        for i in range(left_shape[-1], array.shape[-1] - right_shape[-1], steps[-1]):
+            subarray = array[...,
+                             j - left_shape[-2]:j + right_shape[-2],
+                             i - left_shape[-1]:i + right_shape[-1]]
             if np.isnan(subarray).any() == False:
-                subarray_indices.append((j, i))
+                subarray_indexes.append((j, i))
                 
-    samples_array = np.empty((len(subarray_indices),
-                              subarray_shape[0],
-                              subarray_shape[1]))
-    for i in range(len(subarray_indices)):
-        samples_array[i] = array[subarray_indices[i][0] - left_shape[0]:subarray_indices[i][0] + right_shape[0],
-                                 subarray_indices[i][1] - left_shape[1]:subarray_indices[i][1] + right_shape[1]]
-        
-    return samples_array, subarray_indices
-
+    return subarray_indexes
+                
 @jit(nopython = True)
-def sample_2d_multiarray(array, subarray_shape, steps = (1, 1)):
+def extract_subarrays(array,
+                      sample_array_shape,
+                      subarray_indexes,
+                      is_shape_centered = False):
     '''
-    Extract all the possible sub-arrays that do not contain any NaN
+    Extract all the possible sub-arrays from their indexes
     
-    @param array: A 3D NumPy array. The first dimension represents the variables,
-                  the other two the x and y axis.
-    @param subarray_shape: The 2D shape of the sub-arrays
-    @param steps: The step between each sub-array for each axis, to avoid 
-                  sampling all the possible sub-arrays
+    @param array: A ND NumPy array. The N - 2 first axes represent the variables,
+                  the last two axes represent which the indexes are gotten
+    @param sample_array_shape: The (N + 1)D shape of the array that will contain
+                               the sub-arrays
+    @param subarray_indexes: A list of 2D indexes that locate the sub-arrays
+    @param is_shape_centered: True if the sub-arrays are defined from the
+                              central cell, false if they are defined from the
+                              top-left cell
     
-    @return The sub-arrays as a 4D NumPy array
+    @return The sub-arrays in a (N + 1)D NumPy array
     '''
-    assert len(array.shape) == 3, 'Array must be 3D'
-    assert len(subarray_shape) == 2, 'Subarray shape must be 2D'
-
-    subarray_indices = []
-    for j in range(0, array.shape[1] - subarray_shape[0], steps[0]):
-        for i in range(0, array.shape[2] - subarray_shape[1], steps[1]):
-            subarray = array[:, j:j + subarray_shape[0], i:i + subarray_shape[1]]
-            if np.isnan(subarray).any() == False:
-                subarray_indices.append((j, i))
-                
-    samples_array = np.empty((len(subarray_indices),
-                              array.shape[0],
-                              subarray_shape[0],
-                              subarray_shape[1]))
-    for i in range(len(subarray_indices)):
-        samples_array[i] = array[:,
-                                 subarray_indices[i][0]:subarray_indices[i][0] + subarray_shape[0],
-                                 subarray_indices[i][1]:subarray_indices[i][1] + subarray_shape[1]]
+    assert len(array.shape) >= 2, 'Array must be at least 2D'
+    assert len(sample_array_shape) == len(array.shape) + 1, 'Sample array shape must be one dimension higher than array'
+    
+    left_shape = (0, 0)
+    right_shape = (sample_array_shape[-2],
+                   sample_array_shape[-1])
+    if is_shape_centered == True:
+        left_shape = (int(sample_array_shape[-2]/2),
+                      int(sample_array_shape[-1]/2))
+        right_shape = (int(sample_array_shape[-2]/2) + 1,
+                       int(sample_array_shape[-1]/2) + 1)
+    
+    sample_array = np.empty(sample_array_shape)
+    for i in range(sample_array_shape[0]):
+        sample_array[i] = array[...,
+                                subarray_indexes[i][0] - left_shape[0]:subarray_indexes[i][0] + right_shape[0],
+                                subarray_indexes[i][1] - left_shape[1]:subarray_indexes[i][1] + right_shape[1]]
         
-    return samples_array
+    return sample_array
+
+def sample_array(array,
+                 subarray_shape,
+                 steps = (1, 1),
+                 is_shape_centered = False,
+                 return_subarray_indexes = False):
+    '''
+    Sample an array of all the possible sub-arrays that do not contain any NaN
+    
+    @param array: A ND NumPy array. The N - 2 first axes represent the variables,
+                  the last two axes represent which the indexes are gotten
+    @param subarray_shape: The 2D shape of the sub-arrays
+    @param steps: The step between each sub-array for the last two axes, to avoid 
+                  sampling all the possible sub-arrays
+    @param is_shape_centered: True if the sub-arrays are defined from the
+                              central cell, false if they are defined from the
+                              top-left cell
+    
+    @return The sub-arrays in a (N + 1)D NumPy array
+    '''
+    assert len(array.shape) >= 2, 'Array must be at least 2D'
+    assert len(subarray_shape) == 2, 'Sub-array shape must be 2D'
+    assert len(steps) == 2, 'Steps must be 2D'
+    
+    subarray_indexes = get_valid_subarray_indexes(array,
+                                                  subarray_shape,
+                                                  steps = steps,
+                                                  is_shape_centered = is_shape_centered)
+    sample_array_shape = tuple([len(subarray_indexes)]
+                               + list(array.shape[:-2])
+                               + list(subarray_shape))
+    samples_array = extract_subarrays(array,
+                                      sample_array_shape,
+                                      subarray_indexes,
+                                      is_shape_centered = is_shape_centered)
+    
+    if return_subarray_indexes == False:
+        return samples_array
+    else:
+        return samples_array, subarray_indexes
 
 ################################################################################
 # Projection
