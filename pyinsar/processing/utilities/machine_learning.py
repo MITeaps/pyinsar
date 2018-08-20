@@ -139,49 +139,6 @@ def generate_phase_samples(deformation, satellite_height, radar_wavelength, cell
     params, phases = generate_phase_samples_from_deformation(sim_patches, cut_x_coords, cut_y_coords, satellite_height,
                                                              track_angles,min_ground_range_array)
 
-# def generate_index(data_file, label):
-#     key_list = [ re.search('.*data$', key_name).group() for key_name in data_file.keys()
-#                  if re.search('.*data$', key_name) is not None]
-#     key_list.sort()
-
-#     num_images = np.zeros(len(key_list), dtype=np.int)
-#     index_dict = OrderedDict()
-
-#     for index, key in enumerate(key_list):
-#         index_dict[index] = key
-#         num_images[index] = data_file[key].shape[0]
-
-#     final_index = np.zeros((np.sum(num_images),3), dtype=int)
-#     final_index[:,0] = label
-
-#     current_index = 0
-#     for index in range(len(num_images)):
-#         tmp_num_images = num_images[index]
-#         index_slice = slice(current_index, tmp_num_images+current_index)
-#         final_index[index_slice, 1] = index
-#         final_index[index_slice, 2] = np.arange(tmp_num_images)
-#         current_index += tmp_num_images
-
-
-#     return index_dict, final_index
-
-
-
-# def retrieve_data(index, index_dict, data_file, size):
-#     final_data = np.zeros([index.shape[0]] + list(size))
-
-#     datasets = np.unique(index[:,0])
-
-#     for i in range(len(datasets)):
-#         dataset_name = index_dict[datasets[i]]
-
-#         dataset_index = index[:,0] == datasets[i]
-
-#         final_data[dataset_index,:,:] = data_file[dataset_name][index[dataset_index,1],:,:]
-
-#     return final_data
-
-
 class DataRetriever(object):
     """
     Class for retrieving data from an hdf file
