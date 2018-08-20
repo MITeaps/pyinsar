@@ -24,6 +24,7 @@
 
 import math
 import numpy as np
+from numba import jit, prange
 
 ################################################################################
 # Okada's surface displacement
@@ -227,8 +228,8 @@ def compute_okada_displacement(fault_centroid_x,
                                fault_slip,
                                fault_open,
                                poisson_ratio,
-                               xx_array,
-                               yy_array):
+                               x_array,
+                               y_array):
     '''
     Compute the surface displacements for a rectangular fault, based on
     Okada's model. For more information, see:
@@ -246,37 +247,35 @@ def compute_okada_displacement(fault_centroid_x,
     @param fault_slip: slipe of the fault (same unit as x and y)
     @param fault_open: opening of the fault (same unit as x and y)
     @param poisson_ratio: Poisson's ratio
-    @param xx_array: x cooordinate for the domain within a 2D array
-    @param yy_array: y cooordinate for the domain within a 2D array
+    @param x_array: x cooordinate for the domain within a NumPy array
+    @param y_array: y cooordinate for the domain within a NumPy array
     
     @return The surface displacement field
     '''
-    assert len(xx_array.shape) == 2 and len(yy_array.shape) == 2, "The coordinate arrays must be two-dimensional"
-    
     U1 = math.cos(fault_rake)*fault_slip
     U2 = math.sin(fault_rake)*fault_slip
 
-    east_component = xx_array - fault_centroid_x + math.cos(fault_strike)*math.cos(fault_dip)*fault_width/2.
-    north_component = yy_array - fault_centroid_y - math.sin(fault_strike)*math.cos(fault_dip)*fault_width/2.
-    okada_xx_array = math.cos(fault_strike)*north_component + math.sin(fault_strike)*east_component + fault_length/2.
-    okada_yy_array = math.sin(fault_strike)*north_component - math.cos(fault_strike)*east_component + math.cos(fault_dip)*fault_width
+    east_component = x_array - fault_centroid_x + math.cos(fault_strike)*math.cos(fault_dip)*fault_width/2.
+    north_component = y_array - fault_centroid_y - math.sin(fault_strike)*math.cos(fault_dip)*fault_width/2.
+    okada_x_array = math.cos(fault_strike)*north_component + math.sin(fault_strike)*east_component + fault_length/2.
+    okada_y_array = math.sin(fault_strike)*north_component - math.cos(fault_strike)*east_component + math.cos(fault_dip)*fault_width
     
     d = fault_centroid_depth + math.sin(fault_dip)*fault_width/2.
-    p = okada_yy_array*math.cos(fault_dip) + d*math.sin(fault_dip)
-    q = okada_yy_array*math.sin(fault_dip) - d*math.cos(fault_dip)
+    p = okada_y_array*math.cos(fault_dip) + d*math.sin(fault_dip)
+    q = okada_y_array*math.sin(fault_dip) - d*math.cos(fault_dip)
 
-    displacement_shape = [3] + list(xx_array.shape)
+    displacement_shape = [3] + list(x_array.shape)
     okada_displacement_array = np.zeros(displacement_shape)
     
-    okada_displacement_array[0] = -U1*chinnerys_notation(f_x_strike, okada_xx_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)\
-                                  - U2*chinnerys_notation(f_x_dip, okada_xx_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)\
-                                  + fault_open*chinnerys_notation(f_x_tensile, okada_xx_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)
-    okada_displacement_array[1] = -U1*chinnerys_notation(f_y_strike, okada_xx_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)\
-                                  - U2*chinnerys_notation(f_y_dip, okada_xx_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)\
-                                  + fault_open*chinnerys_notation(f_y_tensile, okada_xx_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)
-    okada_displacement_array[2] = -U1*chinnerys_notation(f_z_strike, okada_xx_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)\
-                                  - U2*chinnerys_notation(f_z_dip, okada_xx_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)\
-                                  + fault_open*chinnerys_notation(f_z_tensile, okada_xx_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)
+    okada_displacement_array[0] = -U1*chinnerys_notation(f_x_strike, okada_x_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)\
+                                  - U2*chinnerys_notation(f_x_dip, okada_x_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)\
+                                  + fault_open*chinnerys_notation(f_x_tensile, okada_x_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)
+    okada_displacement_array[1] = -U1*chinnerys_notation(f_y_strike, okada_x_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)\
+                                  - U2*chinnerys_notation(f_y_dip, okada_x_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)\
+                                  + fault_open*chinnerys_notation(f_y_tensile, okada_x_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)
+    okada_displacement_array[2] = -U1*chinnerys_notation(f_z_strike, okada_x_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)\
+                                  - U2*chinnerys_notation(f_z_dip, okada_x_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)\
+                                  + fault_open*chinnerys_notation(f_z_tensile, okada_x_array, p, q, fault_length, fault_width, fault_dip, poisson_ratio)/(2*np.pi)
 
     displacement_array = np.zeros(displacement_shape)
 
@@ -285,6 +284,333 @@ def compute_okada_displacement(fault_centroid_x,
     displacement_array[2] = okada_displacement_array[2]
             
     return displacement_array
+
+################################################################################
+# Okada's surface displacement with Numba
+################################################################################
+
+@jit(nopython = True)
+def I1_nb(xi, eta, q, delta, nu, R, X, d_tild):
+    '''
+    Compute the component I1 of the model (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return I1
+    '''
+    if math.cos(delta) > 10E-8:
+        return (1 - 2*nu)*(-xi/(math.cos(delta)*(R + d_tild))) - I5_nb(xi, eta, q, delta, nu, R, X, d_tild)*math.sin(delta)/math.cos(delta)
+    else:
+        return -((1 - 2*nu)/2.)*(xi*q/((R + d_tild)**2))
+
+@jit(nopython = True)
+def I2_nb(xi, eta, q, delta, nu, R, y_tild, d_tild):
+    '''
+    Compute the component I2 of the model (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return I2
+    '''
+    return (1 - 2*nu)*(-math.log(R + eta)) - I3_nb(xi, eta, q, delta, nu, R, y_tild, d_tild)
+
+@jit(nopython = True)
+def I3_nb(xi, eta, q, delta, nu, R, y_tild, d_tild):
+    '''
+    Compute the component I3 of the model (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return I3
+    '''
+    if math.cos(delta) > 10E-8:
+        return (1 - 2*nu)*(y_tild/(math.cos(delta)*(R + d_tild)) - math.log(R + eta)) + I4_nb(xi, eta, q, delta, nu, R, d_tild)*math.sin(delta)/math.cos(delta)
+    else:
+        return ((1 - 2*nu)/2.)*(eta/(R + d_tild) + y_tild*q/((R + d_tild)**2) - math.log(R + eta))
+
+@jit(nopython = True)
+def I4_nb(xi, eta, q, delta, nu, R, d_tild):
+    '''
+    Compute the component I4 of the model (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return I4
+    '''
+    if math.cos(delta) > 10E-8:
+        return (1 - 2*nu)*(math.log(R + d_tild) - math.sin(delta)*math.log(R + eta))/math.cos(delta)
+    else:
+        return -(1 - 2*nu)*q/(R + d_tild)
+
+@jit(nopython = True)
+def I5_nb(xi, eta, q, delta, nu, R, X, d_tild):
+    '''
+    Compute the component I5 of the model (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return I5
+    '''
+    if math.cos(delta) > 10E-8:
+        return (1 - 2*nu)*2*math.atan((eta*(X + q*math.cos(delta)) + X*(R + X)*math.sin(delta))/(xi*(R + X)*math.cos(delta)))/math.cos(delta)
+    else:
+        return -(1 - 2*nu)*xi*math.sin(delta)/(R + d_tild)
+
+@jit(nopython = True)
+def f_x_strike_nb(xi, eta, q, delta, nu):
+    '''
+    Fault strike component along the x axis (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return The associated component
+    '''
+    R = math.sqrt(xi**2 + eta**2 + q**2)
+    X = math.sqrt(xi**2 + q**2)
+    d_tild = eta*math.sin(delta) - q*math.cos(delta)
+    return xi*q/(R*(R + eta)) + math.atan(xi*eta/(q*R)) + I1_nb(xi, eta, q, delta, nu, R, X, d_tild)*math.sin(delta)
+@jit(nopython = True)
+def f_x_dip_nb(xi, eta, q, delta, nu):
+    '''
+    Fault dip component along the x axis (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return The associated component
+    '''
+    R = math.sqrt(xi**2 + eta**2 + q**2)
+    y_tild = eta*math.cos(delta) + q*math.sin(delta)
+    d_tild = eta*math.sin(delta) - q*math.cos(delta)
+    return q/R - I3_nb(xi, eta, q, delta, nu, R, y_tild, d_tild)*math.sin(delta)*math.cos(delta)
+@jit(nopython = True)
+def f_x_tensile_nb(xi, eta, q, delta, nu):
+    '''
+    Fault tensile component along the x axis (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return The associated component
+    '''
+    R = math.sqrt(xi**2 + eta**2 + q**2)
+    y_tild = eta*math.cos(delta) + q*math.sin(delta)
+    d_tild = eta*math.sin(delta) - q*math.cos(delta)
+    return (q**2)/(R*(R + eta)) - I3_nb(xi, eta, q, delta, nu, R, y_tild, d_tild)*math.sin(delta)**2
+
+@jit(nopython = True)
+def f_y_strike_nb(xi, eta, q, delta, nu):
+    '''
+    Fault strike component along the y axis (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return The associated component
+    '''
+    R = math.sqrt(xi**2 + eta**2 + q**2)
+    y_tild = eta*math.cos(delta) + q*math.sin(delta)
+    d_tild = eta*math.sin(delta) - q*math.cos(delta)
+    return y_tild*q/(R*(R + eta)) + q*math.cos(delta)/(R + eta) + I2_nb(xi, eta, q, delta, nu, R, y_tild, d_tild)*math.sin(delta)
+@jit(nopython = True)
+def f_y_dip_nb(xi, eta, q, delta, nu):
+    '''
+    Fault dip component along the y axis (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return The associated component
+    '''
+    R = math.sqrt(xi**2 + eta**2 + q**2)
+    X = math.sqrt(xi**2 + q**2)
+    y_tild = eta*math.cos(delta) + q*math.sin(delta)
+    d_tild = eta*math.sin(delta) - q*math.cos(delta)
+    return y_tild*q/(R*(R + xi)) + math.cos(delta)*math.atan(xi*eta/(q*R)) - I1_nb(xi, eta, q, delta, nu, R, X, d_tild)*math.sin(delta)*math.cos(delta)
+@jit(nopython = True)
+def f_y_tensile_nb(xi, eta, q, delta, nu):
+    '''
+    Fault tensile component along the y axis (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return The associated component
+    '''
+    R = math.sqrt(xi**2 + eta**2 + q**2)
+    X = math.sqrt(xi**2 + q**2)
+    y_tild = eta*math.cos(delta) + q*math.sin(delta)
+    d_tild = eta*math.sin(delta) - q*math.cos(delta)
+    return -d_tild*q/(R*(R + xi)) - math.sin(delta)*(xi*q/(R*(R + eta)) - math.atan(xi*eta/(q*R))) - I1_nb(xi, eta, q, delta, nu, R, X, d_tild)*math.sin(delta)**2
+
+@jit(nopython = True)
+def f_z_strike_nb(xi, eta, q, delta, nu):
+    '''
+    Fault strike component along the z axis (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return The associated component
+    '''
+    R = math.sqrt(xi**2 + eta**2 + q**2)
+    d_tild = eta*math.sin(delta) - q*math.cos(delta)
+    return d_tild*q/(R*(R + eta)) + q*math.sin(delta)/(R + eta) + I4_nb(xi, eta, q, delta, nu, R, d_tild)*math.sin(delta)
+@jit(nopython = True)
+def f_z_dip_nb(xi, eta, q, delta, nu):
+    '''
+    Fault dip component along the z axis (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return The associated component
+    '''
+    R = math.sqrt(xi**2 + eta**2 + q**2)
+    X = math.sqrt(xi**2 + q**2)
+    d_tild = eta*math.sin(delta) - q*math.cos(delta)
+    return d_tild*q/(R*(R + xi)) + math.sin(delta)*math.atan(xi*eta/(q*R)) - I5_nb(xi, eta, q, delta, nu, R, X, d_tild)*math.sin(delta)*math.cos(delta)
+@jit(nopython = True)
+def f_z_tensile_nb(xi, eta, q, delta, nu):
+    '''
+    Fault tensile component along the z axis (for more information, see 
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154)
+    
+    @return The associated component
+    '''
+    R = math.sqrt(xi**2 + eta**2 + q**2)
+    X = math.sqrt(xi**2 + q**2)
+    d_tild = eta*math.sin(delta) - q*math.cos(delta)
+    y_tild = eta*math.cos(delta) + q*math.sin(delta)
+    return y_tild*q/(R*(R + xi)) + math.cos(delta)*(xi*q/(R*(R + eta)) - math.atan(xi*eta/(q*R))) - I5_nb(xi, eta, q, delta, nu, R, X, d_tild)*math.sin(delta)**2
+
+@jit(nopython = True)
+def compute_okada_displacement_nb(fault_centroid_x,
+                                  fault_centroid_y,
+                                  fault_centroid_depth,
+                                  fault_strike,
+                                  fault_dip,
+                                  fault_length,
+                                  fault_width,
+                                  fault_rake,
+                                  fault_slip,
+                                  fault_open,
+                                  poisson_ratio,
+                                  x_array,
+                                  y_array):
+    '''
+    Compute the surface displacements for a rectangular fault, based on
+    Okada's model. For more information, see:
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154
+    
+    @param fault_centroid_x: x cooordinate for the fault's centroid
+    @param fault_centroid_y: y cooordinate for the fault's centroid
+    @param fault_centroid_depth: depth of the fault's centroid
+    @param fault_strike: strike of the fault ([0 - 2pi], in radian)
+    @param fault_dip: dip of the fault ([0 - pi/2], in radian)
+    @param fault_length: length of the fault (same unit as x and y)
+    @param fault_width: width of the fault (same unit as x and y)
+    @param fault_rake: rake of the fault ([-pi - pi], in radian)
+    @param fault_slip: slipe of the fault (same unit as x and y)
+    @param fault_open: opening of the fault (same unit as x and y)
+    @param poisson_ratio: Poisson's ratio
+    @param x_array: x cooordinate for the domain within a NumPy array
+    @param y_array: y cooordinate for the domain within a NumPy array
+    
+    @return The surface displacement field
+    '''
+    U1 = math.cos(fault_rake)*fault_slip
+    U2 = math.sin(fault_rake)*fault_slip
+    
+    d = fault_centroid_depth + math.sin(fault_dip)*fault_width/2.
+
+    displacement_array = np.empty((3, x_array.shape[0]))
+    
+    for i, _ in np.ndenumerate(x_array):
+
+        east_component = x_array[i] - fault_centroid_x + math.cos(fault_strike)*math.cos(fault_dip)*fault_width/2.
+        north_component = y_array[i] - fault_centroid_y - math.sin(fault_strike)*math.cos(fault_dip)*fault_width/2.
+        okada_x = math.cos(fault_strike)*north_component + math.sin(fault_strike)*east_component + fault_length/2.
+        okada_y = math.sin(fault_strike)*north_component - math.cos(fault_strike)*east_component + math.cos(fault_dip)*fault_width
+
+        p = okada_y*math.cos(fault_dip) + d*math.sin(fault_dip)
+        q = okada_y*math.sin(fault_dip) - d*math.cos(fault_dip)
+
+        okada_displacement_x = -U1*(f_x_strike_nb(okada_x, p, q, fault_dip, poisson_ratio)
+                                    - f_x_strike_nb(okada_x - fault_length, p, q, fault_dip, poisson_ratio)
+                                    - f_x_strike_nb(okada_x, p - fault_width, q, fault_dip, poisson_ratio)
+                                    + f_x_strike_nb(okada_x - fault_length, p - fault_width, q, fault_dip, poisson_ratio))/(2*np.pi)\
+                               - U2*(f_x_dip_nb(okada_x, p, q, fault_dip, poisson_ratio)
+                                     - f_x_dip_nb(okada_x - fault_length, p, q, fault_dip, poisson_ratio)
+                                     - f_x_dip_nb(okada_x, p - fault_width, q, fault_dip, poisson_ratio)
+                                     + f_x_dip_nb(okada_x - fault_length, p - fault_width, q, fault_dip, poisson_ratio))/(2*np.pi)\
+                               + fault_open*(f_x_tensile_nb(okada_x, p, q, fault_dip, poisson_ratio)
+                                             - f_x_tensile_nb(okada_x - fault_length, p, q, fault_dip, poisson_ratio)
+                                             - f_x_tensile_nb(okada_x, p - fault_width, q, fault_dip, poisson_ratio)
+                                             + f_x_tensile_nb(okada_x - fault_length, p - fault_width, q, fault_dip, poisson_ratio))/(2*np.pi)
+        okada_displacement_y = -U1*(f_y_strike_nb(okada_x, p, q, fault_dip, poisson_ratio)
+                                    - f_y_strike_nb(okada_x - fault_length, p, q, fault_dip, poisson_ratio)
+                                    - f_y_strike_nb(okada_x, p - fault_width, q, fault_dip, poisson_ratio)
+                                    + f_y_strike_nb(okada_x - fault_length, p - fault_width, q, fault_dip, poisson_ratio))/(2*np.pi)\
+                               - U2*(f_y_dip_nb(okada_x, p, q, fault_dip, poisson_ratio)
+                                     - f_y_dip_nb(okada_x - fault_length, p, q, fault_dip, poisson_ratio)
+                                     - f_y_dip_nb(okada_x, p - fault_width, q, fault_dip, poisson_ratio)
+                                     + f_y_dip_nb(okada_x - fault_length, p - fault_width, q, fault_dip, poisson_ratio))/(2*np.pi)\
+                               + fault_open*(f_y_tensile_nb(okada_x, p, q, fault_dip, poisson_ratio)
+                                             - f_y_tensile_nb(okada_x - fault_length, p, q, fault_dip, poisson_ratio)
+                                             - f_y_tensile_nb(okada_x, p - fault_width, q, fault_dip, poisson_ratio)
+                                             + f_y_tensile_nb(okada_x - fault_length, p - fault_width, q, fault_dip, poisson_ratio))/(2*np.pi)
+        displacement_array[0][i] = math.sin(fault_strike)*okada_displacement_x - math.cos(fault_strike)*okada_displacement_y
+        displacement_array[1][i] = math.cos(fault_strike)*okada_displacement_x + math.sin(fault_strike)*okada_displacement_y
+
+        displacement_array[2][i] = -U1*(f_z_strike_nb(okada_x, p, q, fault_dip, poisson_ratio)
+                                        - f_z_strike_nb(okada_x - fault_length, p, q, fault_dip, poisson_ratio)
+                                        - f_z_strike_nb(okada_x, p - fault_width, q, fault_dip, poisson_ratio)
+                                        + f_z_strike_nb(okada_x - fault_length, p - fault_width, q, fault_dip, poisson_ratio))/(2*np.pi)\
+                                  - U2*(f_z_dip_nb(okada_x, p, q, fault_dip, poisson_ratio)
+                                        - f_z_dip_nb(okada_x - fault_length, p, q, fault_dip, poisson_ratio)
+                                        - f_z_dip_nb(okada_x, p - fault_width, q, fault_dip, poisson_ratio)
+                                        + f_z_dip_nb(okada_x - fault_length, p - fault_width, q, fault_dip, poisson_ratio))/(2*np.pi)\
+                                  + fault_open*(f_z_tensile_nb(okada_x, p, q, fault_dip, poisson_ratio)
+                                                - f_z_tensile_nb(okada_x - fault_length, p, q, fault_dip, poisson_ratio)
+                                                - f_z_tensile_nb(okada_x, p - fault_width, q, fault_dip, poisson_ratio)
+                                                + f_z_tensile_nb(okada_x - fault_length, p - fault_width, q, fault_dip, poisson_ratio))/(2*np.pi)
+            
+    return displacement_array
+
+@jit(nopython = True, nogil = True, parallel = True)
+def compute_okada_segments_displacement_nb(segment_parameters, x, y):
+    '''
+    Compute the surface displacements for several rectangular segments, based on
+    Okada's model. For more information, see:
+    Okada, Surface deformation due to shear and tensile faults in a half-space,
+    Bulletin of the Seismological Society of America (1985) 75 (4): 1135-1154
+    
+    @param segment_parameters: a 2D NumPy array or list containing the parameters
+                               of the function compute_okada_displacement_nb for
+                               each segment (except x_array and y_array)
+    @param x_array: x cooordinate for the domain within a NumPy array
+    @param y_array: y cooordinate for the domain within a NumPy array
+    
+    @return The surface displacement field
+    '''
+    displacements = np.empty((segment_parameters.shape[0], 3, x.shape[0]))
+    
+    for i in prange(segment_parameters.shape[0]):
+        displacements[i] = compute_okada_displacement_nb(segment_parameters[i, 0],
+                                                         segment_parameters[i, 1],
+                                                         segment_parameters[i, 2],
+                                                         segment_parameters[i, 3],
+                                                         segment_parameters[i, 4],
+                                                         segment_parameters[i, 5],
+                                                         segment_parameters[i, 6],
+                                                         segment_parameters[i, 7],
+                                                         segment_parameters[i, 8],
+                                                         segment_parameters[i, 9],
+                                                         segment_parameters[i, 10],
+                                                         x,
+                                                         y)
+        
+    displacement = np.zeros((3, x.shape[0]))
+    for i in range(segment_parameters.shape[0]):
+        displacement += displacements[i]
+        
+    return displacement
 
 ################################################################################
 # Okada's internal displacement

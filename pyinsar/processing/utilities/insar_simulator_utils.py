@@ -38,6 +38,23 @@ def wrap(x, to_2pi = False):
         return np.mod(x, 2.*np.pi)
     return np.mod(x + np.pi, 2.*np.pi) - np.pi
 
+def compute_los_vector(rad_incidence_angle, rad_los_azimuth):
+    '''
+    Compute the line-of-sight vector in Cartesian coordinates from spherical
+    coordinates, considering that the vector is from the ground to the satellite
+
+    @param rad_incidence_angle: The incidence angle of the satellite in radian
+    @param rad_los_azimuth: The azimuth of the satellite direction in radian
+
+    @return The line-of-sight vector in Cartesian coordinates
+    '''
+    los_vector = np.empty([3] + list(rad_incidence_angle.shape))
+    los_vector[0] = np.sin(rad_incidence_angle)*np.sin(rad_los_azimuth)
+    los_vector[1] = np.sin(rad_incidence_angle)*np.cos(rad_los_azimuth)
+    los_vector[2] = np.cos(rad_incidence_angle)
+    
+    return los_vector
+
 def crop_array_from_center(array, crop_shape):
     '''
     Crop an array along its borders
