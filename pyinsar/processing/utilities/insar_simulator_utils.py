@@ -234,7 +234,7 @@ def generate_interferogram_from_deformation(track_angle,
     slant_range_1 = np.sqrt(corrected_height_1**2 + ground_range_1**2)
     slant_range_2 = np.sqrt(corrected_height_2**2 + ground_range_2**2)
 
-    phase = change_in_range_to_phase(slant_range_1 - slant_range_2, wavelength)
+    phase = change_in_range_to_phase(slant_range_2 - slant_range_1, wavelength)
 
     return phase
 
