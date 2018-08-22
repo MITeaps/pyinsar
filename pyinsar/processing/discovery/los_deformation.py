@@ -28,7 +28,7 @@
 from skdiscovery.data_structure.framework.base import PipelineItem
 
 # Pyinsar imports
-# from pyinsar.processing.utilities.insar_simulator_utils import
+from pyinsar.processing.utilities.insar_simulator_utils import change_in_range_to_phase, phase_to_change_in_range
 
 # Standard library imports
 from collections import OrderedDict
@@ -38,12 +38,50 @@ import numpy as np
 
 
 
-class LOS_Deformation(PipelineItem):
+class LOS_Deformation_Phase(PipelineItem):
     """
-    *** In Development ***
+    Converts between LOS deformation and phase
 
-    ap_paramList[]
+    *** In Development ***
+    """
+
+    def __init__(self, str_description, wavelength, k=2, convert_target='los', channel_index = None):
+        """
+        Initialize LOS Deformation Phase item
+
+        @param str_description: String describing item
+        @param wavelength: Radar wavelength 
+        @param k: Number of radar passes
+        @param convert_target: Convert to 'los' or 'phase'
+        @param channel_index: Which channel index to use (None if there is no channel axis)
+        """
+
+        self.wavelength = wavelength
+        self.convert_target = convert_target
+        self.channel_index = channel_index
+
+        super(LOS_Deformation_Phase, self).__init__(str_description)
 
     def process(self, obj_data):
-    """
-    pass
+        """
+        Convert between LOS deformation and phase
+
+        @param obj_data: Image Wrapper
+        """
+
+        if self.convert_target == 'los':
+            convert_function  = change_in_range_to_phase
+        elif self.convert_target == 'phase':
+            convert_function = phase_to_change_in_range
+        else:
+            raise RuntimeError('Conversion target "{}" not understood'.format(self.convert_target))
+
+        for label, data in obj_data.getIterator():
+
+            if channel_index is None:
+                data = convert_function(data, self.wavelength, self.k)
+
+            else:
+                data[channel_index, ...] = convert_function(data[channel_index, ...], self.wavelength, self.k)
+
+            obj_data.updateData(label, data)
