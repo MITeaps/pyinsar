@@ -96,3 +96,9 @@ class DataFetcher(DataFetcherBase):
 
         return ImageWrapper(data, -1, metadata)
 
+
+    def randomizeIndex(self):
+        """
+        Shuffle training index
+        """
+        np.random.shuffle(self._index)
