@@ -10,7 +10,7 @@ with open("README.md", 'r', encoding='utf-8') as rfile:
     readme = rfile.read()
 
 setup(name     = package_name,
-      version  = '0.0.5',
+      version  = '0.0.5post1',
       packages = package_list,
 
       install_requires = [
@@ -44,7 +44,7 @@ setup(name     = package_name,
                                 'docs/pyinsar_doxygen.pdf']},
 
 
-      python_requires='>=3.4',
+      python_requires='>=3.6',
 
       long_description = readme,
       long_description_content_type='text/markdown'
