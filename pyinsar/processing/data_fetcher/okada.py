@@ -91,8 +91,8 @@ class DataFetcher(DataFetcherBase):
 
 
         deformation = compute_okada_displacement(**kwargs,
-                                                 xx_array = self._xx_array,
-                                                 yy_array = self._yy_array)
+                                                 x_array = self._xx_array,
+                                                 y_array = self._yy_array)
 
 
 
