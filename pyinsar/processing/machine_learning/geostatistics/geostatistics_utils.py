@@ -49,15 +49,20 @@ def unflatten_index(flattened_index, array_shape):
     i = int(flattened_index%array_shape[1])
     return (j, i)
 
-def standardize(x):
+def standardize(x, axis = None):
     '''
     Reduce and center a float or array
     
     @param x: The float or array
+    @param axis: The axis or axes along which the standardization is done.
     
     @return A float or array
     '''
-    return (x - np.nanmean(x))/np.nanstd(x)
+    return (x - np.nanmean(x,
+                           axis = axis,
+                           keepdims = True))/np.nanstd(x,
+                                                       axis = axis,
+                                                       keepdims = True)
 
 def normalize(x):
     '''

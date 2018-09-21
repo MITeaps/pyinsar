@@ -50,6 +50,7 @@ import shapely as shp
 import shapely.geometry
 import shapely.wkt
 import matplotlib as mpl
+from numba import jit
 
 
 import warnings
@@ -138,6 +139,38 @@ def sorted_alphanumeric(l):
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
 
     return sorted(l, key = alphanum_key)
+
+@jit(nopython = True)
+def expand_nans(array, half_window_shape, max_nan_proportion = 0.):
+    '''
+    Turn a cell to NaN if it is surrounded by a given proportion of NaNs
+    
+    @param array: A 2D NumPy array
+    @param half_window_shape: A tuple with the half-window shape for each of the two dimensions
+    @param max_nan_proportion: The proportion of NaN in the window to change a cell to a NaN
+
+    @return A 2D NumPy array
+    '''
+    assert len(array.shape) == 2, 'Array must be 2D'
+    assert len(half_window_shape) == 2, 'Window shape must be 2D'
+    assert 0. <= max_nan_proportion <= 1., 'Proportion must be between 0 and 1'
+    
+    new_array = np.copy(array)
+    for j in range(array.shape[0]):
+        for i in range(array.shape[1]):
+            nan_counter = 0.
+            cell_counter = 0.
+            for v in range(j - half_window_shape[0], j + half_window_shape[0] + 1):
+                for u in range(i - half_window_shape[1], i + half_window_shape[1] + 1):
+                    if (0 <= v < array.shape[0]
+                        and 0 <= u < array.shape[1]):
+                        cell_counter += 1.
+                        if math.isnan(array[v, u]) == True:
+                            nan_counter += 1.
+            if nan_counter/cell_counter > max_nan_proportion:
+                new_array[j, i] = np.nan
+    
+    return new_array
 
 def phase_shift(data, phase):
     '''

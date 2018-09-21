@@ -285,6 +285,48 @@ def compute_okada_displacement(fault_centroid_x,
             
     return displacement_array
 
+def compute_fault_projection_corners(fault_centroid_x,
+                                     fault_centroid_y,
+                                     fault_strike,
+                                     fault_dip,
+                                     fault_length,
+                                     fault_width):
+    '''
+    Compute the corners of the projection of a fault at the surface
+    
+    @param fault_centroid_x: x cooordinate for the fault's centroid
+    @param fault_centroid_y: y cooordinate for the fault's centroid
+    @param fault_centroid_depth: depth of the fault's centroid
+    @param fault_strike: strike of the fault ([0 - 2pi], in radian)
+    @param fault_dip: dip of the fault ([0 - pi/2], in radian)
+    @param fault_length: length of the fault (same unit as x and y)
+    @param fault_width: width of the fault (same unit as x and y)
+
+    @return A list of corners' coordinates
+    '''
+    okada_x_1 = fault_length/2.
+    okada_x_2 = fault_length/2.
+    okada_x_3 = -fault_length/2.
+    okada_x_4 = -fault_length/2.
+    okada_y_1 = math.cos(fault_dip)*fault_width/2.
+    okada_y_2 = -math.cos(fault_dip)*fault_width/2.
+    okada_y_3 = -math.cos(fault_dip)*fault_width/2.
+    okada_y_4 = math.cos(fault_dip)*fault_width/2.
+    
+    fault_x_1 = math.sin(fault_strike)*okada_x_1 - math.cos(fault_strike)*okada_y_1
+    fault_x_2 = math.sin(fault_strike)*okada_x_2 - math.cos(fault_strike)*okada_y_2
+    fault_x_3 = math.sin(fault_strike)*okada_x_3 - math.cos(fault_strike)*okada_y_3
+    fault_x_4 = math.sin(fault_strike)*okada_x_4 - math.cos(fault_strike)*okada_y_4
+    fault_y_1 = math.cos(fault_strike)*okada_x_1 + math.sin(fault_strike)*okada_y_1
+    fault_y_2 = math.cos(fault_strike)*okada_x_2 + math.sin(fault_strike)*okada_y_2
+    fault_y_3 = math.cos(fault_strike)*okada_x_3 + math.sin(fault_strike)*okada_y_3
+    fault_y_4 = math.cos(fault_strike)*okada_x_4 + math.sin(fault_strike)*okada_y_4
+    
+    return [[fault_centroid_x + fault_x_1, fault_centroid_y + fault_y_1],
+            [fault_centroid_x + fault_x_2, fault_centroid_y + fault_y_2,],
+            [fault_centroid_x + fault_x_3, fault_centroid_y + fault_y_3],
+            [fault_centroid_x + fault_x_4, fault_centroid_y + fault_y_4]]
+
 ################################################################################
 # Okada's surface displacement with Numba
 ################################################################################

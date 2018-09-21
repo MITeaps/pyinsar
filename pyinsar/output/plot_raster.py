@@ -26,7 +26,38 @@ import numpy as np
 
 from numba import jit
 import matplotlib.pyplot as plt
+from matplotlib import colors
 from ipywidgets import interact, interactive, BoundedIntText, Dropdown, HBox
+
+class MidpointNormalize(colors.Normalize):
+    '''
+    Class to normalize some data while defining the colormap midpoint for plotting
+    '''
+    def __init__(self, vmin = None, vmax = None, midpoint = 0, clip = False):
+        '''
+        Initialize an instance
+        
+        @param vmin: The minimal value for the colormap
+        @param vmax: The maximal value for the colormap
+        @param midpoint: The midpoint value for the colormap
+        @param clip: If True, masked values are unmasked and set to 1
+        '''
+        self.midpoint = midpoint
+        colors.Normalize.__init__(self, vmin, vmax, clip)
+
+    def __call__(self, value, clip = None):
+        '''
+        Call an instance
+        
+        @param value: The value to normalize
+        @param clip: If True, masked values are unmasked and set to 1
+        '''
+        normalized_min = max(0, 1/2*(1 - abs((self.midpoint - self.vmin)/(self.midpoint - self.vmax))))
+        normalized_max = min(1, 1/2*(1 + abs((self.vmax - self.midpoint)/(self.midpoint - self.vmin))))
+        normalized_mid = 0.5
+        x, y = [self.vmin, self.midpoint, self.vmax], [normalized_min, normalized_mid, normalized_max]
+        
+        return np.ma.masked_array(np.interp(value, x, y))
 
 def average_minmax_slices(array, axis = 0):
     '''
