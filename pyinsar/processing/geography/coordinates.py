@@ -125,31 +125,31 @@ def extract_subgeoarray(georaster_array,
     
     @return The sub-array and its extent
     '''
-    assert len(georaster_array.shape) == 2, "The array must be two-dimensional"
+    assert len(georaster_array.shape) >= 2, "The array must be two-dimensional"
     assert len(georaster_extent) == 4, "The extent must have contain 4 coordinates"
 
     i_min, j_min = transform_to_pixel_coordinates(x_min, y_min, 
                                                   georaster_extent[0], georaster_extent[1],
                                                   georaster_extent[2], georaster_extent[3], 
-                                                  georaster_array.shape[1], georaster_array.shape[0])
+                                                  georaster_array.shape[-1], georaster_array.shape[-2])
     i_max, j_max = transform_to_pixel_coordinates(x_max, y_max, 
                                                   georaster_extent[0], georaster_extent[1],
                                                   georaster_extent[2], georaster_extent[3], 
-                                                  georaster_array.shape[1], georaster_array.shape[0])
-    new_georaster_array = georaster_array[j_max:j_min, i_min:i_max]
+                                                  georaster_array.shape[-1], georaster_array.shape[-2])
+    new_georaster_array = georaster_array[..., j_max:j_min, i_min:i_max]
 
     new_x_min, new_y_min = transform_to_geographic_coordinates(i_min, j_min, 
                                                                georaster_extent[0], georaster_extent[1],
                                                                georaster_extent[2], georaster_extent[3], 
-                                                               georaster_array.shape[1], georaster_array.shape[0])
+                                                               georaster_array.shape[-1], georaster_array.shape[-2])
     new_x_max, new_y_max = transform_to_geographic_coordinates(i_max, j_max, 
                                                                georaster_extent[0], georaster_extent[1],
                                                                georaster_extent[2], georaster_extent[3], 
-                                                               georaster_array.shape[1], georaster_array.shape[0])
+                                                               georaster_array.shape[-1], georaster_array.shape[-2])
     
     if center_extent == False:
-        pixel_x_size = (georaster_extent[1] - georaster_extent[0])/georaster_array.shape[1]
-        pixel_y_size = (georaster_extent[3] - georaster_extent[2])/georaster_array.shape[0]
+        pixel_x_size = (georaster_extent[1] - georaster_extent[0])/georaster_array.shape[-1]
+        pixel_y_size = (georaster_extent[3] - georaster_extent[2])/georaster_array.shape[-2]
         new_x_min -= 0.5*pixel_x_size
         new_y_min += 0.5*pixel_y_size
         new_x_max -= 0.5*pixel_x_size
@@ -163,6 +163,7 @@ def extract_subgeoarray(georaster_array,
 def get_valid_subarray_indexes(array,
                                subarray_shape,
                                steps = (1, 1),
+                               pads = (0, 0),
                                is_shape_centered = False):
     '''
     Get the indexes of all the possible sub-arrays that do not contain any NaN
@@ -172,6 +173,8 @@ def get_valid_subarray_indexes(array,
     @param subarray_shape: The 2D shape of the sub-arrays
     @param steps: The step between each sub-array for the last two axes, to avoid 
                   sampling all the possible sub-arrays
+    @param pads: Extra row(s) and column(s) to get around the subarrays, without
+                 influencing the subarray indexes
     @param is_shape_centered: True if the sub-arrays are defined from the
                               central cell, false if they are defined from the
                               top-left cell
@@ -191,8 +194,12 @@ def get_valid_subarray_indexes(array,
                        int(subarray_shape[-1]/2) + 1)
 
     subarray_indexes = []
-    for j in range(left_shape[-2], array.shape[-2] - right_shape[-2], steps[-2]):
-        for i in range(left_shape[-1], array.shape[-1] - right_shape[-1], steps[-1]):
+    for j in range(left_shape[-2] + pads[-2],
+                   array.shape[-2] - right_shape[-2] - pads[-2],
+                   steps[-2]):
+        for i in range(left_shape[-1] + pads[-1],
+                       array.shape[-1] - right_shape[-1] - pads[-1],
+                       steps[-1]):
             subarray = array[...,
                              j - left_shape[-2]:j + right_shape[-2],
                              i - left_shape[-1]:i + right_shape[-1]]
@@ -205,6 +212,7 @@ def get_valid_subarray_indexes(array,
 def extract_subarrays(array,
                       sample_array_shape,
                       subarray_indexes,
+                      pads = (0, 0),
                       is_shape_centered = False):
     '''
     Extract all the possible sub-arrays from their indexes
@@ -214,6 +222,8 @@ def extract_subarrays(array,
     @param sample_array_shape: The (N + 1)D shape of the array that will contain
                                the sub-arrays
     @param subarray_indexes: A list of 2D indexes that locate the sub-arrays
+    @param pads: Extra row(s) and column(s) to get around the subarrays, without
+                 influencing the subarray indexes
     @param is_shape_centered: True if the sub-arrays are defined from the
                               central cell, false if they are defined from the
                               top-left cell
@@ -223,9 +233,9 @@ def extract_subarrays(array,
     assert len(array.shape) >= 2, 'Array must be at least 2D'
     assert len(sample_array_shape) == len(array.shape) + 1, 'Sample array shape must be one dimension higher than array'
     
-    left_shape = (0, 0)
-    right_shape = (sample_array_shape[-2],
-                   sample_array_shape[-1])
+    left_shape = (pads[-2], pads[-1])
+    right_shape = (sample_array_shape[-2] - pads[-2],
+                   sample_array_shape[-1] - pads[-1])
     if is_shape_centered == True:
         left_shape = (int(sample_array_shape[-2]/2),
                       int(sample_array_shape[-1]/2))
@@ -243,6 +253,7 @@ def extract_subarrays(array,
 def sample_array(array,
                  subarray_shape,
                  steps = (1, 1),
+                 pads = (0, 0),
                  is_shape_centered = False,
                  return_subarray_indexes = False):
     '''
@@ -253,6 +264,8 @@ def sample_array(array,
     @param subarray_shape: The 2D shape of the sub-arrays
     @param steps: The step between each sub-array for the last two axes, to avoid 
                   sampling all the possible sub-arrays
+    @param pads: Extra row(s) and column(s) to get around the subarrays, without
+                 influencing the subarray indexes
     @param is_shape_centered: True if the sub-arrays are defined from the
                               central cell, false if they are defined from the
                               top-left cell
@@ -262,17 +275,23 @@ def sample_array(array,
     assert len(array.shape) >= 2, 'Array must be at least 2D'
     assert len(subarray_shape) == 2, 'Sub-array shape must be 2D'
     assert len(steps) == 2, 'Steps must be 2D'
+    assert (is_shape_centered == False or 
+            (is_shape_centered == True
+             and (subarray_shape[0] - 1)%2 == 0
+             and (subarray_shape[1] - 1)%2 == 0)), 'When centered, the subarray shape must be odd'
     
     subarray_indexes = get_valid_subarray_indexes(array,
                                                   subarray_shape,
                                                   steps = steps,
+                                                  pads = pads,
                                                   is_shape_centered = is_shape_centered)
     sample_array_shape = tuple([len(subarray_indexes)]
                                + list(array.shape[:-2])
-                               + list(subarray_shape))
+                               + [subarray_shape[-2] + 2*pads[-2], subarray_shape[-1] + 2*pads[-1]])
     samples_array = extract_subarrays(array,
                                       sample_array_shape,
                                       subarray_indexes,
+                                      pads = pads,
                                       is_shape_centered = is_shape_centered)
     
     if return_subarray_indexes == False:

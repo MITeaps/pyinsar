@@ -1,1 +1,1 @@
-__all__ = ["geostatistics"]
+__all__ = ["geostatistics", "neural_networks"]

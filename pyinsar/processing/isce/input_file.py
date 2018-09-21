@@ -123,7 +123,8 @@ def prepare_topsApps(product_paths,
                      orbit_path = None,
                      auxiliary_data_path = None,
                      do_unwrap = True,
-                     unwrapper_name = 'snaphu_mcf'):
+                     unwrapper_name = 'snaphu_mcf',
+                     do_all_successive_pairs = True):
     '''
     Create a Pair_X folder for each successive pair X of Sentinel-1 product in product_paths,
     and create a topsApp.xml to process that pair with ISCE
@@ -134,12 +135,19 @@ def prepare_topsApps(product_paths,
     @param auxiliary_data_path: Path to the folder containing auxiliary data
     @param do_unwrap: True to unwrap the created interferogram, false otherwise
     @param unwrapper_name: Name of the unwrapper when do_unwrap is true
+    @param do_all_successive_pairs: True if all the successive pairs must be
+                                    processed, False if pairs i and i+1, and i+2
+                                    and i+3 are processed, but not i+1 and i+2 
     
     @return The path to the created topsApp.xml file
     '''
     topsApp_paths = []
-    for i in range(len(product_paths) - 1):
-        result_directory = result_folder_path + 'Pair_' + str(i + 1)
+    step = 1
+    if do_all_successive_pairs == False:
+      step = 2
+    pair_index = 1
+    for i in range(0, len(product_paths) - 1, step):
+        result_directory = result_folder_path + 'Pair_' + str(pair_index)
         os.makedirs(result_directory, exist_ok = True)
         topsApp_paths.append(create_topsApp_xml(result_directory,
                                                 product_paths[i],
@@ -152,5 +160,6 @@ def prepare_topsApps(product_paths,
                                                 slave_auxiliary_data_path = auxiliary_data_path,
                                                 do_unwrap = do_unwrap,
                                                 unwrapper_name = unwrapper_name))
+        pair_index += 1
         
     return topsApp_paths

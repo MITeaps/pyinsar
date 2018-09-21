@@ -1,1 +1,1 @@
-__all__ = ["elastic_halfspace"]
+__all__ = ["elastic_halfspace", "inversion"]
