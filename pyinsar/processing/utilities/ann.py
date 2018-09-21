@@ -16,16 +16,20 @@ def per_channel_standardization(input_tensor, name=None):
     return tf.divide(input_tensor - mean, stddev, name=name)
 
 
-def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_bands = 1,
-             conv_filters = [40,20], conv_kernels = [[9,9],[5,5]]):
+def buildCNN(image_height, image_width, model_dir, config=None, num_bands = 1,
+             conv_filters = [40,20], conv_kernels = [[9,9],[5,5]],
+             optimizer = tf.train.GradientDescentOptimizer(0.01)):
     """
     Build a convolutional neural network
 
     @param image_height: Height of image in pixels
     @param image_width: Width of image in pixels
     @param model_dir: Directory to save network too
-    @param rate: Learning rate
     @param config: Config to pass to tf.Session
+    @param num_bands: Number of channels in image
+    @param conv_filters: Number of convolution filters for each layer
+    @param conv_kernels: Kernel sizes for each layer
+    @param optimizer: Optimizer to use
     """
     graph = tf.Graph()
 
@@ -57,6 +61,7 @@ def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_b
 
                 pool = tf.layers.max_pooling2d(conv_layer,
                                                pool_size=[2,2],
+
                                                strides=2,
                                                name = 'Max_Pool_' + str(conv_index))
 
@@ -87,7 +92,7 @@ def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_b
             loss = tf.reduce_mean(entropy, name='Loss')
 
         with tf.name_scope('Train'):
-            gradient = tf.train.GradientDescentOptimizer(rate)
+            gradient = optimizer
             global_step = tf.train.get_or_create_global_step()
             minimize = gradient.minimize(loss, global_step = global_step, name='Minimize')
 
@@ -109,7 +114,7 @@ def buildCNN(image_height, image_width, model_dir, rate=0.01, config=None, num_b
         graph.add_to_collection('logits', logits)
 
         initializer.run()
-        saver = tf.train.Saver(name='Saver')
+        saver = tf.train.Saver(name='Saver', save_relative_paths=True)
         saver.save(session, os.path.join(model_dir,'network'))
 
 
@@ -221,10 +226,10 @@ def reshape_images(images):
         return np.moveaxis(images, 1,3)
 
     elif images.ndim == 3:
-        return images.reshape(-1, *images.shape, 1)
+        return images.reshape(*images.shape, 1)
 
     else:
-        raise RuntimeError('Can only handle 2 or 3 dimension arrays')
+        raise RuntimeError('Can only handle 3 or 4 dimension arrays')
 
 def length_after_valid_window(length, window, stride):
     """
@@ -263,7 +268,7 @@ def restoreGraph(model_dir):
 
     with graph.as_default():
         model_checkpoint = tf.train.latest_checkpoint(model_dir)
-        saver =  tf.train.import_meta_graph(model_checkpoint + '.meta')
+        saver =  tf.train.import_meta_graph(model_checkpoint + '.meta', clear_devices=True)
 
         op_dict['train'] = graph.get_collection('train')[0]
         op_dict['input'] = graph.get_collection('input')[0]
