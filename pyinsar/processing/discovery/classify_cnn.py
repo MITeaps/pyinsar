@@ -82,8 +82,6 @@ class ClassifyCNN(PipelineItem):
             if self.stride is not None:
                 extents, processed_data = divideIntoSquares(data, self.size, self.stride)
 
-                print(processed_data.shape)
-
             else:
                 processed_data = data
                 extents = np.array([[0, data.shape[-2], 0, data.shape[-1]]])
